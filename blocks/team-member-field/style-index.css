@@ -1,0 +1,22 @@
+/* Frontend styles for Team Member Field block */
+.team-member-field-block {
+    margin-bottom: 15px;
+}
+
+.team-member-field-label {
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.team-member-field-content {
+    display: inline;
+}
+
+.team-member-field-content a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.team-member-field-content a:hover {
+    text-decoration: underline;
+}

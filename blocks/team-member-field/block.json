@@ -1,0 +1,82 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "rtm/team-member-field",
+	"version": "1.0.0",
+	"title": "Team Member Field",
+	"category": "rtm-blocks",
+	"icon": "groups",
+	"description": "Display team member custom fields with customizable text.",
+	"example": {},
+	"usesContext": ["postId", "postType"],
+	"supports": {
+		"html": false,
+		"align": true,
+		"color": {
+			"gradients": true,
+			"link": true,
+			"__experimentalDefaultControls": {
+				"background": true,
+				"text": true
+			}
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true,
+			"__experimentalDefaultControls": {
+				"margin": false,
+				"padding": false
+			}
+		},
+		"typography": {
+			"fontSize": true,
+			"lineHeight": true,
+			"__experimentalFontFamily": true,
+			"__experimentalFontWeight": true,
+			"__experimentalFontStyle": true,
+			"__experimentalTextTransform": true,
+			"__experimentalTextDecoration": true,
+			"__experimentalLetterSpacing": true,
+			"__experimentalDefaultControls": {
+				"fontSize": true
+			}
+		}
+	},
+	"attributes": {
+		"content": {
+			"type": "string",
+			"source": "html",
+			"selector": ".team-member-field-content",
+			"default": ""
+		},
+		"fieldName": {
+			"type": "string",
+			"default": "rtm_position"
+		},
+		"showLabel": {
+			"type": "boolean",
+			"default": true
+		},
+		"customLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"fallbackText": {
+			"type": "string",
+			"default": ""
+		},
+		"makeLink": {
+			"type": "boolean",
+			"default": false
+		},
+		"linkText": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"textdomain": "research-team-manager",
+	"editorScript": "file:./build/index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css",
+	"render": "file:./render.php"
+}

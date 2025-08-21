@@ -1,0 +1,26 @@
+/* Editor styles for Team Member Field block */
+.team-member-field-block {
+    padding: 10px;
+    border: 1px dashed #ddd;
+    background: #f9f9f9;
+    margin-bottom: 10px;
+}
+
+.team-member-field-preview {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.team-member-field-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.team-member-field-content {
+    color: #666;
+}
+
+.team-member-field-placeholder {
+    color: #999;
+    font-style: italic;
+}

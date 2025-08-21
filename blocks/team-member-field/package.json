@@ -1,0 +1,20 @@
+{
+  "name": "team-member-field-block",
+  "version": "1.0.0",
+  "description": "Team Member Field Block for Research Team Manager",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^26.19.0"
+  },
+  "dependencies": {
+    "@wordpress/blocks": "^12.20.0",
+    "@wordpress/block-editor": "^12.11.0",
+    "@wordpress/components": "^25.8.0",
+    "@wordpress/i18n": "^4.42.0",
+    "@wordpress/icons": "^9.33.0",
+    "@wordpress/data": "^9.12.0"
+  }
+}

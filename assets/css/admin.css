@@ -1,0 +1,475 @@
+/* Research Team Manager - Admin Styles */
+
+/* Team Member Admin List */
+.rtm-no-image {
+    width: 50px;
+    height: 50px;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #666;
+    border-radius: 4px;
+}
+
+/* Meta Box Styles */
+.rtm-meta-box {
+    background: #fff;
+}
+
+.rtm-meta-box table.form-table {
+    margin-top: 0;
+}
+
+.rtm-meta-box .form-table th {
+    width: 200px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.rtm-meta-box .form-table td {
+    vertical-align: top;
+    padding-top: 15px;
+}
+
+.rtm-meta-box .description {
+    color: #666;
+    font-style: italic;
+    margin-top: 5px;
+    font-size: 13px;
+}
+
+.rtm-meta-box input[type="text"],
+.rtm-meta-box input[type="email"],
+.rtm-meta-box input[type="tel"],
+.rtm-meta-box input[type="url"],
+.rtm-meta-box input[type="date"],
+.rtm-meta-box input[type="number"] {
+    width: 100%;
+    max-width: 400px;
+}
+
+.rtm-meta-box textarea {
+    width: 100%;
+    max-width: 500px;
+}
+
+.rtm-meta-box .regular-text {
+    width: 100%;
+    max-width: 400px;
+}
+
+.rtm-meta-box .large-text {
+    width: 100%;
+    max-width: 500px;
+}
+
+.rtm-meta-box .small-text {
+    width: 80px;
+}
+
+/* Checkbox styling */
+.rtm-meta-box input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.rtm-meta-box label[for*="rtm_is_current"] {
+    font-weight: normal;
+    color: #555;
+}
+
+/* Publications Admin Page */
+.rtm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.rtm-stat-card {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    border-radius: 4px;
+}
+
+.rtm-stat-card h3 {
+    margin: 0 0 10px 0;
+    color: #1d2327;
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.rtm-stat-card p {
+    margin: 0;
+    color: #646970;
+    font-size: 14px;
+}
+
+/* Publications Table */
+.rtm-publications-table {
+    margin-top: 30px;
+}
+
+.rtm-publications-table h2 {
+    color: #1d2327;
+    margin-bottom: 15px;
+}
+
+.rtm-publications-table .wp-list-table {
+    margin-top: 10px;
+}
+
+.rtm-publications-table .wp-list-table th,
+.rtm-publications-table .wp-list-table td {
+    padding: 12px;
+}
+
+.rtm-publications-table .wp-list-table th {
+    background: #f9f9f9;
+    font-weight: 600;
+}
+
+.rtm-publications-table .wp-list-table td {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.rtm-publications-table .wp-list-table tr:hover {
+    background: #f9f9f9;
+}
+
+.rtm-delete-pub {
+    color: #a00;
+    border-color: #a00;
+}
+
+.rtm-delete-pub:hover {
+    background: #a00;
+    color: #fff;
+}
+
+/* Scholar Settings Page */
+.rtm-test-connection {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 30px;
+}
+
+.rtm-test-connection h3 {
+    margin-top: 0;
+    color: #1d2327;
+}
+
+.rtm-test-connection p {
+    color: #646970;
+    margin-bottom: 15px;
+}
+
+#rtm-test-results {
+    margin-top: 15px;
+}
+
+#rtm-test-results .notice {
+    margin: 0;
+}
+
+#rtm-test-results h4 {
+    margin: 15px 0 10px 0;
+    color: #1d2327;
+}
+
+#rtm-test-results ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+#rtm-test-results ul li {
+    margin-bottom: 5px;
+    color: #555;
+    font-size: 13px;
+}
+
+/* Button Styles */
+.button.button-primary.rtm-sync-btn {
+    background: #007cba;
+    border-color: #007cba;
+}
+
+.button.button-primary.rtm-sync-btn:hover {
+    background: #005a87;
+    border-color: #005a87;
+}
+
+.button.button-secondary.rtm-test-btn {
+    border-color: #007cba;
+    color: #007cba;
+}
+
+.button.button-secondary.rtm-test-btn:hover {
+    background: #007cba;
+    color: #fff;
+}
+
+/* Notice Styles */
+.notice.rtm-notice {
+    border-left-color: #007cba;
+}
+
+.notice.rtm-notice.notice-success {
+    border-left-color: #46b450;
+}
+
+.notice.rtm-notice.notice-error {
+    border-left-color: #dc3232;
+}
+
+/* Form Section Separators */
+.rtm-form-section {
+    border-top: 1px solid #e0e0e0;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.rtm-form-section:first-child {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.rtm-form-section h3 {
+    margin: 0 0 15px 0;
+    color: #1d2327;
+    font-size: 16px;
+}
+
+/* Side Meta Box Styles */
+.postbox .rtm-meta-box table.form-table th {
+    width: 100px;
+    font-size: 13px;
+    padding-left: 0;
+}
+
+.postbox .rtm-meta-box table.form-table td {
+    padding-left: 0;
+}
+
+.postbox .rtm-meta-box input[type="text"],
+.postbox .rtm-meta-box input[type="email"],
+.postbox .rtm-meta-box input[type="tel"],
+.postbox .rtm-meta-box input[type="url"] {
+    width: 100%;
+    max-width: none;
+}
+
+/* Responsive Admin Styles */
+@media screen and (max-width: 782px) {
+    .rtm-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .rtm-meta-box .form-table th,
+    .rtm-meta-box .form-table td {
+        display: block;
+        width: 100%;
+        padding: 10px 0;
+    }
+    
+    .rtm-meta-box .form-table th {
+        border-bottom: none;
+        padding-bottom: 5px;
+    }
+    
+    .rtm-meta-box input[type="text"],
+    .rtm-meta-box input[type="email"],
+    .rtm-meta-box input[type="tel"],
+    .rtm-meta-box input[type="url"],
+    .rtm-meta-box input[type="date"],
+    .rtm-meta-box input[type="number"],
+    .rtm-meta-box textarea {
+        max-width: 100%;
+    }
+}
+
+/* Loading States */
+.rtm-loading {
+    position: relative;
+}
+
+.rtm-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.8);
+    z-index: 10;
+}
+
+.rtm-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007cba;
+    border-radius: 50%;
+    animation: rtm-spin 1s linear infinite;
+    margin-left: 5px;
+}
+
+@keyframes rtm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Error States */
+.rtm-error {
+    color: #dc3232;
+    background: #ffeaea;
+    border: 1px solid #dc3232;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.rtm-success {
+    color: #46b450;
+    background: #eafaf1;
+    border: 1px solid #46b450;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Custom Field Groups */
+.rtm-field-group {
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.rtm-field-group h4 {
+    margin: 0 0 10px 0;
+    color: #1d2327;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.rtm-field-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+}
+
+.rtm-field-row:last-child {
+    margin-bottom: 0;
+}
+
+.rtm-field-col {
+    flex: 1;
+}
+
+.rtm-field-col label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #1d2327;
+}
+
+.rtm-field-col input,
+.rtm-field-col select,
+.rtm-field-col textarea {
+    width: 100%;
+}
+
+/* Drag and Drop Reordering */
+.rtm-sortable {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.rtm-sortable li {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 5px;
+    padding: 10px;
+    cursor: move;
+    border-radius: 4px;
+}
+
+.rtm-sortable li:hover {
+    background: #f9f9f9;
+}
+
+.rtm-sortable .ui-sortable-helper {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transform: rotate(5deg);
+}
+
+.rtm-drag-handle {
+    color: #666;
+    cursor: grab;
+    margin-right: 10px;
+}
+
+.rtm-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Taxonomy Styles in Meta Boxes */
+.rtm-taxonomy-checklist {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background: #fafafa;
+    border-radius: 4px;
+}
+
+.rtm-taxonomy-checklist ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rtm-taxonomy-checklist li {
+    margin-bottom: 5px;
+}
+
+.rtm-taxonomy-checklist label {
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Quick Edit Styles */
+.quick-edit-row .rtm-quick-edit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.rtm-quick-edit-field {
+    flex: 1;
+    min-width: 200px;
+}
+
+.rtm-quick-edit-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.rtm-quick-edit-field input,
+.rtm-quick-edit-field select {
+    width: 100%;
+}
