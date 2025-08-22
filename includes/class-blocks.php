@@ -13,6 +13,7 @@ class RTM_Blocks {
     public function __construct() {
         add_action('init', array($this, 'register_blocks'), 20); // Later priority
         add_action('init', array($this, 'register_block_category'), 5); // Early priority for category
+        add_action('enqueue_block_editor_assets', array($this, 'enqueue_block_editor_assets'));
         error_log('RTM: Blocks class initialized');
     }
     
@@ -164,5 +165,18 @@ class RTM_Blocks {
         }
         
         return '';
+    }
+    
+    /**
+     * Enqueue block editor assets
+     */
+    public function enqueue_block_editor_assets() {
+        wp_enqueue_script(
+            'rtm-block-editor-extensions',
+            plugin_dir_url(dirname(__FILE__)) . 'assets/block-editor-extensions.js',
+            array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-compose', 'wp-hooks'),
+            '1.0.0',
+            true
+        );
     }
 }

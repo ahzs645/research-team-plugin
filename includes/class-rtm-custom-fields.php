@@ -16,103 +16,32 @@ class RTM_Custom_Fields {
     
     public function add_meta_boxes() {
         add_meta_box(
-            'rtm_team_member_info',
-            __('Team Member Information', 'research-team-manager'),
-            array($this, 'team_member_info_callback'),
+            'rtm_team_member_dates',
+            __('Team Member Dates & Priority', 'research-team-manager'),
+            array($this, 'team_member_dates_callback'),
             'team_member',
             'normal',
             'high'
         );
-        
-        add_meta_box(
-            'rtm_contact_info',
-            __('Contact Information', 'research-team-manager'),
-            array($this, 'contact_info_callback'),
-            'team_member',
-            'side',
-            'default'
-        );
-        
-        add_meta_box(
-            'rtm_social_links',
-            __('Social & Professional Links', 'research-team-manager'),
-            array($this, 'social_links_callback'),
-            'team_member',
-            'side',
-            'default'
-        );
     }
     
-    public function team_member_info_callback($post) {
+    public function team_member_dates_callback($post) {
         wp_nonce_field('rtm_save_meta_box_data', 'rtm_meta_box_nonce');
         
-        $position = get_post_meta($post->ID, '_rtm_position', true);
-        $department = get_post_meta($post->ID, '_rtm_department', true);
-        $education = get_post_meta($post->ID, '_rtm_education', true);
-        $research_interests = get_post_meta($post->ID, '_rtm_research_interests', true);
-        $biography = get_post_meta($post->ID, '_rtm_biography', true);
         $start_date = get_post_meta($post->ID, '_rtm_start_date', true);
         $end_date = get_post_meta($post->ID, '_rtm_end_date', true);
-        $is_current = get_post_meta($post->ID, '_rtm_is_current', true);
         $order = get_post_meta($post->ID, '_rtm_order', true);
+        $date_priority = get_post_meta($post->ID, '_rtm_date_priority', true);
         
         ?>
         <table class="form-table">
-            <tr>
-                <th scope="row">
-                    <label for="rtm_position"><?php _e('Position/Title', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <input type="text" id="rtm_position" name="rtm_position" value="<?php echo esc_attr($position); ?>" class="regular-text" />
-                    <p class="description"><?php _e('e.g., Principal Investigator, PhD Student, Postdoc', 'research-team-manager'); ?></p>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label for="rtm_department"><?php _e('Department/Institution', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <input type="text" id="rtm_department" name="rtm_department" value="<?php echo esc_attr($department); ?>" class="regular-text" />
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label for="rtm_education"><?php _e('Education/Degrees', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <textarea id="rtm_education" name="rtm_education" rows="3" cols="50" class="large-text"><?php echo esc_textarea($education); ?></textarea>
-                    <p class="description"><?php _e('List degrees, institutions, and years', 'research-team-manager'); ?></p>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label for="rtm_research_interests"><?php _e('Research Interests', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <textarea id="rtm_research_interests" name="rtm_research_interests" rows="3" cols="50" class="large-text"><?php echo esc_textarea($research_interests); ?></textarea>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label for="rtm_biography"><?php _e('Biography', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <?php
-                    wp_editor($biography, 'rtm_biography', array(
-                        'textarea_name' => 'rtm_biography',
-                        'media_buttons' => false,
-                        'textarea_rows' => 8,
-                        'teeny' => true,
-                    ));
-                    ?>
-                </td>
-            </tr>
             <tr>
                 <th scope="row">
                     <label for="rtm_start_date"><?php _e('Start Date', 'research-team-manager'); ?></label>
                 </th>
                 <td>
                     <input type="date" id="rtm_start_date" name="rtm_start_date" value="<?php echo esc_attr($start_date); ?>" />
+                    <p class="description"><?php _e('Date when this member joined the team', 'research-team-manager'); ?></p>
                 </td>
             </tr>
             <tr>
@@ -121,16 +50,7 @@ class RTM_Custom_Fields {
                 </th>
                 <td>
                     <input type="date" id="rtm_end_date" name="rtm_end_date" value="<?php echo esc_attr($end_date); ?>" />
-                    <p class="description"><?php _e('Leave blank for current members', 'research-team-manager'); ?></p>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label for="rtm_is_current"><?php _e('Current Member', 'research-team-manager'); ?></label>
-                </th>
-                <td>
-                    <input type="checkbox" id="rtm_is_current" name="rtm_is_current" value="1" <?php checked($is_current, '1'); ?> />
-                    <label for="rtm_is_current"><?php _e('This person is currently part of the team', 'research-team-manager'); ?></label>
+                    <p class="description"><?php _e('Date when this member left the team (leave blank for current members)', 'research-team-manager'); ?></p>
                 </td>
             </tr>
             <tr>
@@ -139,14 +59,26 @@ class RTM_Custom_Fields {
                 </th>
                 <td>
                     <input type="number" id="rtm_order" name="rtm_order" value="<?php echo esc_attr($order); ?>" min="0" step="1" class="small-text" />
-                    <p class="description"><?php _e('Lower numbers appear first', 'research-team-manager'); ?></p>
+                    <p class="description"><?php _e('Lower numbers appear first (used for both custom order and priority sorting)', 'research-team-manager'); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="rtm_date_priority"><?php _e('Priority Override', 'research-team-manager'); ?></label>
+                </th>
+                <td>
+                    <input type="checkbox" id="rtm_date_priority" name="rtm_date_priority" value="1" <?php checked($date_priority, '1'); ?> />
+                    <label for="rtm_date_priority"><?php _e('Prioritize this member when using date-based sorting', 'research-team-manager'); ?></label>
+                    <p class="description"><?php _e('When checked and sorting by dates, this member will appear before non-prioritized members', 'research-team-manager'); ?></p>
                 </td>
             </tr>
         </table>
         <?php
     }
     
+    
     public function contact_info_callback($post) {
+        // This function is no longer used - ACF handles these fields
         $email = get_post_meta($post->ID, '_rtm_email', true);
         $phone = get_post_meta($post->ID, '_rtm_phone', true);
         $office = get_post_meta($post->ID, '_rtm_office', true);
@@ -274,24 +206,10 @@ class RTM_Custom_Fields {
             return;
         }
         
+        // Only save the fields we're actually using now
         $fields = array(
-            'rtm_position' => 'sanitize_text_field',
-            'rtm_department' => 'sanitize_text_field',
-            'rtm_education' => 'sanitize_textarea_field',
-            'rtm_research_interests' => 'sanitize_textarea_field',
-            'rtm_biography' => 'wp_kses_post',
             'rtm_start_date' => 'sanitize_text_field',
             'rtm_end_date' => 'sanitize_text_field',
-            'rtm_email' => 'sanitize_email',
-            'rtm_phone' => 'sanitize_text_field',
-            'rtm_office' => 'sanitize_text_field',
-            'rtm_website' => 'esc_url_raw',
-            'rtm_linkedin' => 'esc_url_raw',
-            'rtm_twitter' => 'esc_url_raw',
-            'rtm_google_scholar' => 'esc_url_raw',
-            'rtm_orcid' => 'esc_url_raw',
-            'rtm_researchgate' => 'esc_url_raw',
-            'rtm_github' => 'esc_url_raw',
             'rtm_order' => 'absint',
         );
         
@@ -302,7 +220,8 @@ class RTM_Custom_Fields {
             }
         }
         
-        $is_current = isset($_POST['rtm_is_current']) ? '1' : '0';
-        update_post_meta($post_id, '_rtm_is_current', $is_current);
+        // Save date priority checkbox
+        $date_priority = isset($_POST['rtm_date_priority']) ? '1' : '0';
+        update_post_meta($post_id, '_rtm_date_priority', $date_priority);
     }
 }

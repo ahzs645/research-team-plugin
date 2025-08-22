@@ -869,13 +869,16 @@ function rtm_init_plugin() {
     rtm_create_publications_table();
 }
 
-// Include blocks class
+// Include required classes
 require_once plugin_dir_path(__FILE__) . 'includes/class-blocks.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-custom-fields.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-rest-api.php';
 
-// Initialize blocks
+// Initialize blocks and custom fields
 add_action('init', 'rtm_init_blocks');
 function rtm_init_blocks() {
     new RTM_Blocks();
+    new RTM_Custom_Fields();
 }
 
 // CSS and JS assets are now handled by the child theme
