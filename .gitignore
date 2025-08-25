@@ -1,0 +1,51 @@
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vs/
+
+# Node.js (for block development)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/
+
+# Build files
+build/
+dist/
+
+# WordPress
+wp-config-local.php
+.htaccess
+
+# Plugin specific
+utilities/articles-import.json
+utilities/config.php
+utilities/database-config.php
+
+# Logs
+*.log
+error_log
+debug.log
+
+# Temporary files
+*.tmp
+*.temp
+.sass-cache/
+
+# Backup files
+*.bak
+*.backup
+*~

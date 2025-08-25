@@ -1,67 +1,130 @@
 # Research Team Manager
 
-A comprehensive WordPress plugin for managing research team members and publications with Google Scholar integration.
+A comprehensive WordPress plugin for managing research team members and publications with Google Scholar integration. This plugin provides a complete solution for academic institutions, research groups, and organizations to showcase their team members and track publications.
 
-## Features
+## 🚀 Features
 
-### Team Member Management
-- Custom post type for team members with rich metadata
-- Secure custom fields for personal and professional information
-- Profile pictures and biographical information
-- Contact information and social media links
-- Research areas and team roles taxonomy
-- Current/former member status tracking
+### 👥 Team Member Management
+- **Custom Post Type**: Dedicated post type for team members with rich metadata
+- **Advanced Custom Fields**: Secure fields for personal and professional information
+- **Profile Management**: Profile pictures, biographical information, and detailed descriptions
+- **Contact Information**: Email, phone, website, and social media links
+- **Academic Profiles**: Integration with Google Scholar, LinkedIn, and ResearchGate
+- **Member Status**: Track current members vs alumni with detailed status management
+- **Position & Role Tracking**: Flexible position titles and member types (Faculty, PhD Student, Postdoc, etc.)
+- **Date Tracking**: Join dates, leave dates, and tenure information
+- **Custom Sorting**: Advanced sorting options including priority overrides and custom ordering
 
-### Publications Management
-- Automatic sync with Google Scholar profiles
-- Publication database with citations tracking
-- Admin interface for managing publications
-- Shortcodes for displaying publications on frontend
-- Configurable sync frequency and settings
+### 📚 Publications Management  
+- **Google Scholar Integration**: Planned feature for automatic sync (currently manual upload only)
+- **Publication Database**: Comprehensive tracking with citations and metadata
+- **Admin Interface**: User-friendly management of publications
+- **Frontend Display**: Shortcodes and blocks for displaying publications
+- **Manual Import**: Upload and manage publications through admin interface
+- **Citation Tracking**: Monitor citation counts and publication metrics
 
-### Frontend Display
-- Responsive team member grid/list layouts
-- Filtering by role and research area
-- Individual team member profile pages
-- Publications listing with search capabilities
-- Social media integration
+### 🎨 Frontend Display & Gutenberg Integration
+- **Custom Blocks**: Team member field blocks for the Gutenberg editor
+- **Query Loop Extensions**: Enhanced sorting options for Query Loop blocks
+- **Responsive Layouts**: Team member grid/list layouts that work on all devices
+- **Advanced Filtering**: Filter by role, research area, and member status
+- **Individual Profiles**: Dedicated team member profile pages
+- **Template System**: Customizable templates for archives and single pages
+- **Social Media Integration**: Display social profiles and academic networks
 
-## Installation
+### 🛠️ Developer Features
+- **REST API**: Full REST API support for custom integrations
+- **Custom Taxonomies**: Research areas and team roles
+- **Extensible Architecture**: Well-structured OOP codebase
+- **WordPress Standards**: Follows WordPress coding standards and best practices
+- **Translation Ready**: Full internationalization support
+
+## 📋 Requirements
 
 1. Upload the plugin files to `/wp-content/plugins/research-team-manager/`
 2. Activate the plugin through the WordPress admin
-3. Configure Google Scholar settings under Team Members > Scholar Settings
-4. Start adding team members and syncing publications
+3. Start adding team members through the admin interface
+4. Manually upload publications or wait for automatic Google Scholar sync (coming soon)
 
 ## Configuration
 
-### Google Scholar Setup
-1. Go to **Team Members > Scholar Settings**
-2. Enter your Google Scholar User ID (from your profile URL)
-3. Configure automatic sync preferences
-4. Test the connection
+- WordPress 5.0 or higher
+- PHP 7.4 or higher
+- MySQL 5.6 or higher
 
-### Adding Team Members
-1. Go to **Team Members > Add New**
-2. Fill in member information including:
-   - Name, position, and department
-   - Contact details and social links
-   - Research interests and biography
-   - Profile picture
-3. Assign research areas and team roles
-4. Publish the team member
+## 📦 Installation
 
-## Shortcodes
+### Standard Installation
+1. Download the plugin files
+2. Upload to your `/wp-content/plugins/research-team-manager/` directory
+3. Activate the plugin through the WordPress admin
+4. Configure settings under **Team Members > Settings**
+
+### Manual Installation
+1. Upload the plugin folder to `/wp-content/plugins/`
+2. Activate through **Plugins > Installed Plugins**
+3. Configure initial settings
+
+## ⚙️ Configuration
+
+### Initial Setup
+1. **Activate the Plugin**: Navigate to Plugins and activate Research Team Manager
+2. **Configure Settings**: Go to **Team Members > Settings** to configure basic options
+3. **Set Permissions**: Ensure appropriate user roles have access to manage team members
+
+### Publications Management (Current: Manual Upload)
+1. Go to **Team Members > Publications** to manually upload publications
+2. Add publication details including title, authors, journal, and citation info
+3. Link publications to specific team members
+4. **Note**: Automatic Google Scholar sync is planned for future release
+
+### Team Member Setup
+1. Navigate to **Team Members > Add New**
+2. Fill in comprehensive member information:
+   - **Basic Info**: Name, position, department, member type
+   - **Contact**: Email, phone, website
+   - **Academic Profiles**: Google Scholar, LinkedIn, ResearchGate URLs
+   - **Descriptions**: Short description (for listings) and long description (for profile pages)
+   - **Dates**: Join date, leave date (if applicable)
+   - **Settings**: Member status, position, display order, priority override
+3. Set featured image as profile picture
+4. Assign to research areas and team roles
+5. Publish the team member
+
+## 🎨 Usage
+
+### Gutenberg Blocks
+The plugin extends Gutenberg with custom blocks and enhancements:
+
+#### Team Member Field Block
+Display specific team member information in posts and pages:
+- Member name, position, contact info
+- Academic profile links
+- Customizable field selection
+
+#### Query Loop Extensions
+Enhanced sorting options for Query Loop blocks:
+- Sort by join date, leave date, custom order
+- Priority override functionality
+- Alumni-specific sorting
+
+### Custom Sorting Options
+- **Start Date**: Sort by when members joined
+- **End Date**: Sort by leave dates (useful for alumni)
+- **Custom Order**: Manual ordering via Display Order field
+- **Date Priority**: Priority members first, then chronological
+
+## 📝 Shortcodes
 
 ### Team Members Display
-```
+```shortcode
 [rtm_team_members limit="10" show_current_only="true" layout="grid" columns="3"]
 ```
 
 **Parameters:**
 - `limit` - Number of members to show (-1 for all)
 - `role` - Filter by specific role slug
-- `research_area` - Filter by research area slug
+- `research_area` - Filter by research area slug  
 - `show_current_only` - Show only current members (true/false)
 - `layout` - Display layout (grid/list)
 - `columns` - Number of columns for grid layout (2-4)
@@ -70,21 +133,164 @@ A comprehensive WordPress plugin for managing research team members and publicat
 - `show_social` - Display social media links (true/false)
 
 ### Publications Display
-```
+```shortcode
 [rtm_publications limit="10" show_citations="true" group_by_year="true"]
 ```
 
 **Parameters:**
-- `limit` - Number of publications to show
+- `limit` - Number of publications to show (-1 for all)
 - `show_citations` - Display citation counts (true/false)
 - `show_abstract` - Show publication abstracts (true/false)
 - `group_by_year` - Group publications by year (true/false)
+- `author_filter` - Filter by specific author
+- `year_filter` - Filter by publication year
 
-## Template Customization
+## 🎨 Template Customization
 
-The plugin includes default templates that can be overridden in your theme:
+The plugin includes customizable templates that can be overridden in your theme:
 
+### Template Files
 1. Copy template files from `plugins/research-team-manager/templates/` to your theme directory
+2. Customize as needed:
+   - `archive-team_member.php` - Team members archive page
+   - `single-team_member.php` - Individual member profile page
+
+### Available Template Tags
+- `rtm_get_member_field($field_name)` - Get specific member field
+- `rtm_display_member_contact()` - Display contact information
+- `rtm_display_member_social()` - Display social media links
+- `rtm_display_member_publications()` - Show member's publications
+
+## 🔧 Advanced Features
+
+### Custom Fields Available
+- **Basic Information**: Position, member type, member status
+- **Contact Details**: Email, phone, website  
+- **Academic Profiles**: Google Scholar, LinkedIn, ResearchGate URLs
+- **Descriptions**: Short and long descriptions with rich text support
+- **Date Tracking**: Start date, end date for tenure tracking
+- **Display Settings**: Custom order, priority override for featured positioning
+
+### REST API Endpoints
+- `GET /wp-json/rtm/v1/team-members` - Retrieve team members
+- `GET /wp-json/rtm/v1/publications` - Retrieve publications
+- `POST /wp-json/rtm/v1/sync-scholar` - Trigger Scholar sync
+
+### Hooks & Filters
+```php
+// Customize member data before save
+add_filter('rtm_before_member_save', 'your_custom_function');
+
+// Modify publication display
+add_filter('rtm_publication_display', 'your_display_function');
+
+// Custom sorting logic
+add_filter('rtm_custom_sort_query', 'your_sort_function');
+```
+
+## 📚 Documentation
+
+### Field Mapping
+See `FIELD-MAPPING.md` for detailed information about:
+- Import field mappings from other systems
+- Custom field structure and usage
+- Taxonomy relationships
+
+### Sorting Documentation  
+See `SORTING-DOCUMENTATION.md` for comprehensive guide on:
+- Advanced sorting options
+- Query Loop customizations
+- Priority and custom ordering
+
+## 🛠️ Development
+
+### Plugin Structure
+```
+research-team-manager/
+├── admin/                     # Admin interface classes
+├── assets/                    # CSS, JS, and media files
+├── blocks/                    # Gutenberg blocks
+├── includes/                  # Core plugin classes
+├── public/                    # Frontend functionality
+├── templates/                 # Theme template files
+├── research-team-manager.php  # Main plugin file
+└── README.md                  # This file
+```
+
+### Key Classes
+- `RTM_Post_Types` - Custom post types and taxonomies
+- `RTM_Custom_Fields` - Meta fields and data handling
+- `RTM_Publications` - Google Scholar integration
+- `RTM_Admin` - Administrative interface
+- `RTM_Public` - Frontend display logic
+- `RTM_Blocks` - Gutenberg block functionality
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Publications not syncing:**
+- Verify Google Scholar User ID is correct
+- Check WordPress cron is functioning
+- Manually trigger sync in admin panel
+
+**Team members not displaying:**
+- Ensure members are published (not draft)
+- Check template files are correctly placed
+- Verify shortcode parameters
+
+**Sorting not working:**
+- Confirm custom fields are populated
+- Check Query Loop block HTML syntax
+- Verify sorting parameter names
+
+### Debug Mode
+Enable WordPress debug mode to troubleshoot issues:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow WordPress coding standards
+4. Test thoroughly
+5. Submit a pull request
+
+### Coding Standards
+- Follow WordPress PHP Coding Standards
+- Use proper sanitization and validation
+- Include inline documentation
+- Write clean, readable code
+
+## 📄 License
+
+This plugin is licensed under GPL v2 or later.
+
+## 🆘 Support
+
+For support and questions:
+- Check the documentation files included with the plugin
+- Review common troubleshooting steps above
+- Submit issues with detailed information
+
+## 📈 Changelog
+
+### Version 1.0.0
+- Initial release
+- Team member management
+- Google Scholar integration
+- Custom blocks and sorting
+- Publications tracking
+- REST API support
+
+---
+
+**Research Team Manager** - Streamline your academic team management with powerful WordPress integration.
 2. Customize as needed while maintaining the basic structure
 3. Available templates:
    - `single-team_member.php` - Individual member pages
@@ -110,17 +316,18 @@ The plugin includes comprehensive CSS for styling. To customize:
 - SQL injection prevention with prepared statements
 - XSS protection with proper output escaping
 
-## Google Scholar Integration
+## Google Scholar Integration (Planned Feature)
 
-The plugin scrapes Google Scholar profiles to automatically import publications. This includes:
+**Current Status**: The plugin currently supports manual publication upload only. Automatic Google Scholar integration is planned for a future release.
 
-- Publication titles and authors
-- Journal information and publication year
-- Citation counts (updated on sync)
-- Links to original papers
-- Abstract information where available
+**Planned Features**:
+- Automatic scraping of Google Scholar profiles to import publications
+- Publication titles, authors, and journal information sync
+- Citation counts with regular updates
+- Links to original papers and abstracts
+- Respectful scraping with appropriate delays to avoid blocking
 
-**Note:** Google Scholar scraping is done respectfully with appropriate delays and user-agent strings to avoid being blocked.
+**Current Workaround**: Use the manual publication upload feature in the admin interface to add publications until automatic sync is available.
 
 ## Database Structure
 
@@ -166,11 +373,10 @@ Custom fields stored in WordPress meta tables:
 
 ### Common Issues
 
-**Google Scholar sync not working:**
-- Verify the User ID is correct
-- Check if your site can make external HTTP requests
-- Ensure the Scholar profile is public
-- Try manual sync in admin
+**Publications not displaying:**
+- Verify publications have been manually uploaded through admin interface
+- Check that publications are properly linked to team members
+- Clear any caching plugins
 
 **Team member images not displaying:**
 - Check file permissions on uploads directory
@@ -196,20 +402,28 @@ This will enable detailed logging for troubleshooting issues.
 
 For support and feature requests, please:
 1. Check the documentation above
-2. Review the plugin settings
-3. Test with default theme to rule out conflicts
-4. Contact your developer for custom implementations
+2. Review technical documentation in the [`docs/`](docs/) folder:
+   - [Field Mapping Documentation](docs/FIELD-MAPPING.md) - For data migration
+   - [Custom Sorting Documentation](docs/SORTING-DOCUMENTATION.md) - For advanced display options
+3. Review the plugin settings
+4. Test with default theme to rule out conflicts
+5. Contact your developer for custom implementations
 
 ## Changelog
 
 ### Version 1.0.0
 - Initial release
 - Team member management system
-- Google Scholar integration
-- Publications management
+- Manual publications management
 - Frontend display templates
 - Responsive design
 - Security hardening
+
+### Planned Features (Upcoming Releases)
+- **Google Scholar Integration**: Automatic publication sync from Google Scholar profiles
+- **Advanced Analytics**: Publication metrics and citation tracking
+- **Enhanced Filters**: More sophisticated filtering options
+- **Export Features**: CSV/PDF export capabilities
 
 ## License
 
