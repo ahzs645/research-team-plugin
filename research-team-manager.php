@@ -3,7 +3,7 @@
  * Plugin Name: Research Team Manager Simple
  * Plugin URI: https://example.com/research-team-manager
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.1.0');
+define('RTM_VERSION', '1.2.0');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -88,7 +88,7 @@ function rtm_get_scholar_id_for_team($team_id = 0) {
  * Resolve a team to a term ID for front-end display contexts.
  *
  * Order of precedence: an explicit shortcode value (slug or numeric ID) →
- * the current `research_team` archive → the single-mode default team.
+ * the current `research_team` archive → the single-mode active team.
  * Returns 0 when no specific team applies (i.e. show everything).
  *
  * @param string|int $team Slug, term ID, or '' to auto-detect.
@@ -112,6 +112,90 @@ function rtm_resolve_team_id($team = '') {
 
     $active = rtm_get_active_team();
     return $active ? (int) $active->term_id : 0;
+}
+
+/**
+ * Discipline themes used to group labs. Keyed by slug (stored in the
+ * `rtm_team_theme` term meta); the order here is the display order.
+ *
+ * @return array slug => label
+ */
+function rtm_team_themes() {
+    return array(
+        'physical-sciences-engineering'     => __('Physical Sciences, Engineering & Technology', 'research-team-manager'),
+        'natural-resources-environment'     => __('Natural Resources, Geography & Environment', 'research-team-manager'),
+        'health-human-development'          => __('Health & Human Development', 'research-team-manager'),
+        'interdisciplinary-data-innovation' => __('Interdisciplinary Innovation & Data Resources', 'research-team-manager'),
+    );
+}
+
+/**
+ * Short labels for the theme filter chips. Falls back to the full label.
+ *
+ * @return array slug => short label
+ */
+function rtm_team_theme_short_labels() {
+    return array(
+        'physical-sciences-engineering'     => __('Physical Sciences', 'research-team-manager'),
+        'natural-resources-environment'     => __('Natural Resources', 'research-team-manager'),
+        'health-human-development'          => __('Health', 'research-team-manager'),
+        'interdisciplinary-data-innovation' => __('Interdisciplinary', 'research-team-manager'),
+    );
+}
+
+/**
+ * The kind of research unit a team is (stored in `rtm_team_type` term meta).
+ *
+ * @return string[]
+ */
+function rtm_team_types() {
+    return array('Lab', 'Research Group', 'Centre', 'Institute', 'Hub', 'Network', 'Working Group', 'Field Station', 'Facility', 'Program', 'Other');
+}
+
+/**
+ * Label for a team's website link, based on its `rtm_team_link_type`
+ * ('website' = a dedicated lab site, 'info' = a general info page).
+ *
+ * @param string $type  The stored link type.
+ * @param bool   $short Use the compact label (for cards).
+ * @return string
+ */
+function rtm_team_link_label($type, $short = false) {
+    if ($type === 'info') {
+        return $short ? __('More info', 'research-team-manager') : __('More information', 'research-team-manager');
+    }
+    return $short ? __('Official site', 'research-team-manager') : __('Official lab website', 'research-team-manager');
+}
+
+/**
+ * The member post IDs designated as a team's lead(s).
+ *
+ * @return int[]
+ */
+function rtm_get_team_lead_ids($term_id) {
+    $ids = get_term_meta($term_id, 'rtm_team_lead_ids', true);
+    return is_array($ids) ? array_map('intval', $ids) : array();
+}
+
+/**
+ * Plain-text lead label for a team — the linked members' names for a person
+ * lead, the organization name for an org lead (with legacy text fallback).
+ */
+function rtm_team_lead_text($term_id) {
+    if (get_term_meta($term_id, 'rtm_team_lead_type', true) === 'org') {
+        return (string) get_term_meta($term_id, 'rtm_team_pi', true);
+    }
+    $names = array();
+    foreach (rtm_get_team_lead_ids($term_id) as $id) {
+        $name = get_the_title($id);
+        if ($name) {
+            $names[] = $name;
+        }
+    }
+    if ($names) {
+        return implode(', ', $names);
+    }
+    return (string) get_term_meta($term_id, 'rtm_team_pi', true); // legacy free-text fallback
 }
 
 // Plugin activation hook
@@ -207,10 +291,14 @@ function rtm_create_default_member_status_terms() {
 add_action('init', 'rtm_register_team_member_post_type');
 function rtm_register_team_member_post_type() {
     
+    // In multiple-teams mode the section manages many labs, so present the
+    // top-level admin menu as "Research Labs"; single mode stays "Team Members".
+    $menu_name = rtm_is_multiple_teams() ? 'Research Labs' : 'Team Members';
+
     $labels = array(
         'name'                  => 'Team Members',
         'singular_name'         => 'Team Member',
-        'menu_name'             => 'Team Members',
+        'menu_name'             => $menu_name,
         'add_new'               => 'Add New',
         'add_new_item'          => 'Add New Team Member',
         'edit_item'             => 'Edit Team Member',
@@ -389,73 +477,256 @@ function rtm_add_admin_menus() {
     );
 }
 
-// Team Settings page: choose single vs multiple-teams mode
+// Team Settings page: a guarded pipeline for switching between single and
+// multiple-teams mode (and choosing the active team / what happens to the rest).
 function rtm_team_settings_page() {
-    if (isset($_POST['submit']) && check_admin_referer('rtm_save_team_settings', 'rtm_team_settings_nonce')) {
-        $mode = isset($_POST['rtm_team_mode']) && $_POST['rtm_team_mode'] === 'single' ? 'single' : 'multiple';
-        update_option('rtm_team_mode', $mode);
-        update_option('rtm_default_team', isset($_POST['rtm_default_team']) ? (int) $_POST['rtm_default_team'] : 0);
-
-        // Re-register so the Teams admin UI shows/hides immediately, then flush.
-        rtm_register_team_member_post_type();
-        flush_rewrite_rules();
-
-        echo '<div class="notice notice-success"><p>' . esc_html__('Team settings saved.', 'research-team-manager') . '</p></div>';
-    }
+    rtm_team_settings_handle_post();
 
     $mode         = rtm_get_team_mode();
     $default_team = (int) get_option('rtm_default_team', 0);
-    $teams        = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false));
+    $teams        = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'orderby' => 'name'));
     if (is_wp_error($teams)) {
         $teams = array();
     }
+    $team_count   = count($teams);
+    $member_count = array_sum((array) wp_count_posts('rtm_team_member'));
     ?>
     <div class="wrap">
         <h1><?php esc_html_e('Team Settings', 'research-team-manager'); ?></h1>
 
-        <form method="post" action="">
-            <?php wp_nonce_field('rtm_save_team_settings', 'rtm_team_settings_nonce'); ?>
+        <p style="font-size:14px;">
+            <?php
+            printf(
+                /* translators: 1: mode label */
+                esc_html__('Current mode: %s', 'research-team-manager'),
+                '<strong>' . ($mode === 'multiple'
+                    ? esc_html__('Multiple teams', 'research-team-manager')
+                    : esc_html__('Single team', 'research-team-manager')) . '</strong>'
+            );
+            if ($mode === 'multiple') {
+                echo ' &middot; ' . esc_html(sprintf(_n('%d team', '%d teams', $team_count, 'research-team-manager'), $team_count));
+            }
+            ?>
+        </p>
 
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><?php esc_html_e('Team Mode', 'research-team-manager'); ?></th>
-                    <td>
-                        <fieldset>
-                            <label style="display:block; margin-bottom:8px;">
-                                <input type="radio" name="rtm_team_mode" value="multiple" <?php checked($mode, 'multiple'); ?> />
-                                <strong><?php esc_html_e('Multiple teams', 'research-team-manager'); ?></strong>
-                                &mdash; <?php esc_html_e('one research team page per lab. Adds a "Teams" taxonomy and per-lab settings, pages and publications.', 'research-team-manager'); ?>
-                            </label>
-                            <label style="display:block;">
-                                <input type="radio" name="rtm_team_mode" value="single" <?php checked($mode, 'single'); ?> />
-                                <strong><?php esc_html_e('Single team', 'research-team-manager'); ?></strong>
-                                &mdash; <?php esc_html_e('one team only. Hides the Teams UI and uses the global Scholar ID / publications list.', 'research-team-manager'); ?>
-                            </label>
-                        </fieldset>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="rtm_default_team"><?php esc_html_e('Default team (single mode)', 'research-team-manager'); ?></label>
-                    </th>
-                    <td>
-                        <select name="rtm_default_team" id="rtm_default_team">
-                            <option value="0"><?php esc_html_e('— None (show all members) —', 'research-team-manager'); ?></option>
-                            <?php foreach ($teams as $team): ?>
-                                <option value="<?php echo esc_attr($team->term_id); ?>" <?php selected($default_team, $team->term_id); ?>>
-                                    <?php echo esc_html($team->name); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <p class="description"><?php esc_html_e('Used only in single-team mode to scope listings to one team. Leave as "None" to show every member.', 'research-team-manager'); ?></p>
-                    </td>
-                </tr>
-            </table>
+        <?php if ($mode === 'single'): ?>
 
-            <?php submit_button(); ?>
-        </form>
+            <?php // Active team within single mode ?>
+            <div class="card" style="max-width:680px;">
+                <h2><?php esc_html_e('Active team', 'research-team-manager'); ?></h2>
+                <p class="description"><?php esc_html_e('In single-team mode, listings are scoped to this team. Choose “None” to show all members.', 'research-team-manager'); ?></p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('rtm_update_active', 'rtm_update_active_nonce'); ?>
+                    <input type="hidden" name="rtm_action" value="update_active" />
+                    <select name="rtm_default_team">
+                        <option value="0"><?php esc_html_e('— None (show all members) —', 'research-team-manager'); ?></option>
+                        <?php foreach ($teams as $team): ?>
+                            <option value="<?php echo esc_attr($team->term_id); ?>" <?php selected($default_team, $team->term_id); ?>><?php echo esc_html($team->name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php submit_button(__('Save active team', 'research-team-manager'), 'secondary', 'submit', false); ?>
+                </form>
+            </div>
+
+            <?php // Switch to multiple ?>
+            <div class="card" style="max-width:680px; margin-top:20px;">
+                <h2><?php esc_html_e('Switch to multiple teams', 'research-team-manager'); ?></h2>
+                <p class="description"><?php esc_html_e('Turns on the Teams taxonomy, per-lab pages, settings and publications. Your existing members stay; optionally gather them into a starter team so nothing is left unassigned.', 'research-team-manager'); ?></p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('rtm_to_multiple', 'rtm_to_multiple_nonce'); ?>
+                    <input type="hidden" name="rtm_action" value="to_multiple" />
+                    <p>
+                        <label><input type="checkbox" name="rtm_create_starter" value="1" checked /> <?php esc_html_e('Create a starter team named:', 'research-team-manager'); ?></label>
+                        <input type="text" name="rtm_starter_name" value="<?php echo esc_attr(get_bloginfo('name') . ' Lab'); ?>" class="regular-text" />
+                    </p>
+                    <p>
+                        <label><input type="checkbox" name="rtm_move_members" value="1" checked /> <?php echo esc_html(sprintf(__('Move all %d existing member(s) into the starter team', 'research-team-manager'), $member_count)); ?></label>
+                    </p>
+                    <?php submit_button(__('Switch to multiple teams', 'research-team-manager'), 'primary', 'submit', false); ?>
+                </form>
+            </div>
+
+        <?php else: // multiple ?>
+
+            <div class="card" style="max-width:760px;">
+                <h2><?php esc_html_e('Switch to single team', 'research-team-manager'); ?></h2>
+                <p class="description"><?php esc_html_e('Single mode shows one team only and hides the Teams UI. Pick which team stays active, and decide what to do with the others.', 'research-team-manager'); ?></p>
+
+                <?php if ($team_count === 0): ?>
+                    <p><em><?php esc_html_e('There are no teams yet.', 'research-team-manager'); ?></em></p>
+                    <form method="post" action="">
+                        <?php wp_nonce_field('rtm_to_single', 'rtm_to_single_nonce'); ?>
+                        <input type="hidden" name="rtm_action" value="to_single" />
+                        <input type="hidden" name="rtm_active_team" value="0" />
+                        <input type="hidden" name="rtm_other_teams" value="keep" />
+                        <?php submit_button(__('Switch to single team', 'research-team-manager'), 'primary', 'submit', false); ?>
+                    </form>
+                <?php else: ?>
+                    <form method="post" action="" onsubmit="return rtmConfirmToSingle(this);">
+                        <?php wp_nonce_field('rtm_to_single', 'rtm_to_single_nonce'); ?>
+                        <input type="hidden" name="rtm_action" value="to_single" />
+
+                        <table class="form-table">
+                            <tr>
+                                <th scope="row"><label for="rtm_active_team"><?php esc_html_e('Active team', 'research-team-manager'); ?></label></th>
+                                <td>
+                                    <select name="rtm_active_team" id="rtm_active_team">
+                                        <option value="0"><?php esc_html_e('— None (keep all members, show all) —', 'research-team-manager'); ?></option>
+                                        <?php foreach ($teams as $team): ?>
+                                            <option value="<?php echo esc_attr($team->term_id); ?>" <?php selected($default_team, $team->term_id); ?>><?php echo esc_html($team->name); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e('The other teams', 'research-team-manager'); ?></th>
+                                <td>
+                                    <fieldset>
+                                        <label style="display:block; margin-bottom:6px;"><input type="radio" name="rtm_other_teams" value="keep" checked /> <?php esc_html_e('Keep them (just hidden) — non-destructive, reversible', 'research-team-manager'); ?></label>
+                                        <label style="display:block; margin-bottom:6px;"><input type="radio" name="rtm_other_teams" value="delete" /> <?php esc_html_e('Delete the other teams (members are kept, just unassigned)', 'research-team-manager'); ?></label>
+                                        <label style="display:block;"><input type="radio" name="rtm_other_teams" value="delete_with_members" /> <?php esc_html_e('Delete the other teams AND their members (members not in the active team are permanently deleted)', 'research-team-manager'); ?></label>
+                                    </fieldset>
+                                    <p style="margin-top:10px;">
+                                        <label><input type="checkbox" name="rtm_confirm_delete" value="1" /> <?php esc_html_e('I understand the delete options are permanent.', 'research-team-manager'); ?></label>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <?php submit_button(__('Switch to single team', 'research-team-manager'), 'primary', 'submit', false); ?>
+                    </form>
+                    <script>
+                    function rtmConfirmToSingle(f){
+                        var d = f.querySelector('input[name="rtm_other_teams"]:checked');
+                        if (d && d.value !== 'keep') {
+                            return confirm(<?php echo wp_json_encode(__('This will permanently delete the other teams (and possibly their members). Continue?', 'research-team-manager')); ?>);
+                        }
+                        return true;
+                    }
+                    </script>
+                <?php endif; ?>
+            </div>
+
+        <?php endif; ?>
     </div>
     <?php
+}
+
+// Process the Team Settings conversion forms.
+function rtm_team_settings_handle_post() {
+    if (!isset($_POST['rtm_action']) || !current_user_can('manage_options')) {
+        return;
+    }
+    $action = sanitize_key($_POST['rtm_action']);
+
+    // Change active team (already in single mode).
+    if ($action === 'update_active' && check_admin_referer('rtm_update_active', 'rtm_update_active_nonce')) {
+        update_option('rtm_default_team', isset($_POST['rtm_default_team']) ? (int) $_POST['rtm_default_team'] : 0);
+        rtm_admin_notice(__('Active team updated.', 'research-team-manager'));
+        return;
+    }
+
+    // Single -> Multiple.
+    if ($action === 'to_multiple' && check_admin_referer('rtm_to_multiple', 'rtm_to_multiple_nonce')) {
+        update_option('rtm_team_mode', 'multiple');
+        update_option('rtm_default_team', 0);
+        $extra = '';
+
+        if (!empty($_POST['rtm_create_starter'])) {
+            $name = sanitize_text_field(wp_unslash($_POST['rtm_starter_name'] ?? ''));
+            if ($name === '') {
+                $name = __('Main Lab', 'research-team-manager');
+            }
+            $existing = get_term_by('name', $name, 'rtm_research_team');
+            if ($existing) {
+                $team_id = (int) $existing->term_id;
+            } else {
+                $res = wp_insert_term($name, 'rtm_research_team');
+                $team_id = is_wp_error($res) ? 0 : (int) $res['term_id'];
+            }
+
+            if ($team_id && !empty($_POST['rtm_move_members'])) {
+                $ids = get_posts(array('post_type' => 'rtm_team_member', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids'));
+                $moved = 0;
+                foreach ($ids as $pid) {
+                    $cur = wp_get_object_terms($pid, 'rtm_research_team', array('fields' => 'ids'));
+                    if (empty($cur) || is_wp_error($cur)) {
+                        wp_set_object_terms($pid, array($team_id), 'rtm_research_team');
+                        $moved++;
+                    }
+                }
+                $extra = ' ' . sprintf(__('Created “%1$s” and moved %2$d member(s) into it.', 'research-team-manager'), $name, $moved);
+            } elseif ($team_id) {
+                $extra = ' ' . sprintf(__('Created starter team “%s”.', 'research-team-manager'), $name);
+            }
+        }
+
+        rtm_register_team_member_post_type();
+        flush_rewrite_rules();
+        rtm_admin_notice(__('Switched to multiple-teams mode.', 'research-team-manager') . $extra);
+        return;
+    }
+
+    // Multiple -> Single.
+    if ($action === 'to_single' && check_admin_referer('rtm_to_single', 'rtm_to_single_nonce')) {
+        $active       = isset($_POST['rtm_active_team']) ? (int) $_POST['rtm_active_team'] : 0;
+        $disposition  = sanitize_key($_POST['rtm_other_teams'] ?? 'keep');
+        $destructive  = in_array($disposition, array('delete', 'delete_with_members'), true);
+
+        if ($destructive && empty($_POST['rtm_confirm_delete'])) {
+            rtm_admin_notice(__('Please tick the confirmation box to delete other teams. Nothing was changed.', 'research-team-manager'), 'error');
+            return;
+        }
+        if ($destructive && !$active) {
+            rtm_admin_notice(__('Choose an active team to keep before deleting the others. Nothing was changed.', 'research-team-manager'), 'error');
+            return;
+        }
+
+        update_option('rtm_team_mode', 'single');
+        update_option('rtm_default_team', $active);
+        $extra = '';
+
+        if ($destructive) {
+            $ids = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'fields' => 'ids'));
+            $deleted = 0;
+            foreach ((array) $ids as $tid) {
+                if ((int) $tid === $active) {
+                    continue;
+                }
+                wp_delete_term((int) $tid, 'rtm_research_team');
+                $deleted++;
+            }
+            $extra = ' ' . sprintf(__('Deleted %d other team(s).', 'research-team-manager'), $deleted);
+
+            if ($disposition === 'delete_with_members') {
+                // Members now with no team at all (those only in deleted teams).
+                $orphans = get_posts(array(
+                    'post_type'   => 'rtm_team_member',
+                    'post_status' => 'any',
+                    'numberposts' => -1,
+                    'fields'      => 'ids',
+                    'tax_query'   => array(array('taxonomy' => 'rtm_research_team', 'operator' => 'NOT EXISTS')),
+                ));
+                $removed = 0;
+                foreach ($orphans as $pid) {
+                    wp_delete_post($pid, true);
+                    $removed++;
+                }
+                $extra .= ' ' . sprintf(__('Removed %d member(s) with no remaining team.', 'research-team-manager'), $removed);
+            }
+        }
+
+        rtm_register_team_member_post_type();
+        flush_rewrite_rules();
+        rtm_admin_notice(__('Switched to single-team mode.', 'research-team-manager') . $extra);
+        return;
+    }
+}
+
+// Print an admin notice inline (the settings handler runs during page render,
+// after the admin_notices hook has already fired).
+function rtm_admin_notice($message, $type = 'success') {
+    printf('<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr($type), esc_html($message));
 }
 
 // Publications page
@@ -543,17 +814,21 @@ function rtm_publications_page() {
         </div>
 
         <div style="margin: 20px 0;">
-            <form method="post" style="display: inline-block; margin-right: 10px;">
-                <?php wp_nonce_field('rtm_sync_publications', 'rtm_sync_nonce'); ?>
-                <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
-                <input type="submit" name="sync_publications" class="button button-primary" value="Sync Publications from Google Scholar" />
-            </form>
+            <?php if ($multiple && !$selected_team): ?>
+                <p class="description"><?php esc_html_e('Select a team above to sync or import its publications. (Syncing pulls from that team’s own Google Scholar profile.)', 'research-team-manager'); ?></p>
+            <?php else: ?>
+                <form method="post" style="display: inline-block; margin-right: 10px;">
+                    <?php wp_nonce_field('rtm_sync_publications', 'rtm_sync_nonce'); ?>
+                    <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
+                    <input type="submit" name="sync_publications" class="button button-primary" value="<?php echo esc_attr($selected_team ? sprintf(__('Sync “%s” from Google Scholar', 'research-team-manager'), $team_names[$selected_team] ?? __('team', 'research-team-manager')) : __('Sync Publications from Google Scholar', 'research-team-manager')); ?>" />
+                </form>
 
-            <form method="post" style="display: inline-block;">
-                <?php wp_nonce_field('rtm_import_json', 'rtm_import_nonce'); ?>
-                <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
-                <input type="submit" name="import_json" class="button button-secondary" value="Import from JSON File" />
-            </form>
+                <form method="post" style="display: inline-block;">
+                    <?php wp_nonce_field('rtm_import_json', 'rtm_import_nonce'); ?>
+                    <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
+                    <input type="submit" name="import_json" class="button button-secondary" value="<?php esc_attr_e('Import from JSON File', 'research-team-manager'); ?>" />
+                </form>
+            <?php endif; ?>
         </div>
 
         <?php if (!empty($publications)): ?>
@@ -596,58 +871,113 @@ function rtm_publications_page() {
     <?php
 }
 
-// Scholar Settings page
+// Scholar Settings page — per-team table in multiple mode, single global ID otherwise.
 function rtm_scholar_settings_page() {
-    // Save settings
+    if (rtm_is_multiple_teams()) {
+        rtm_scholar_settings_page_multi();
+        return;
+    }
+
+    // Save settings (single-team mode)
     if (isset($_POST['submit']) && wp_verify_nonce($_POST['rtm_settings_nonce'], 'rtm_save_settings')) {
         update_option('rtm_google_scholar_user_id', sanitize_text_field(wp_unslash($_POST['rtm_google_scholar_user_id'])));
         echo '<div class="notice notice-success"><p>Settings saved!</p></div>';
     }
-    
-    $user_id = get_option('rtm_google_scholar_user_id', '');
 
+    $user_id = get_option('rtm_google_scholar_user_id', '');
     ?>
     <div class="wrap">
         <h1>Google Scholar Settings</h1>
-        <p class="description"><?php esc_html_e('This is the global / single-team fallback Scholar ID. In multiple-teams mode each team sets its own Scholar ID on its team edit screen.', 'research-team-manager'); ?></p>
-        
         <form method="post" action="">
             <?php wp_nonce_field('rtm_save_settings', 'rtm_settings_nonce'); ?>
-            
             <table class="form-table">
                 <tr>
-                    <th scope="row">
-                        <label for="rtm_google_scholar_user_id">Google Scholar User ID</label>
-                    </th>
+                    <th scope="row"><label for="rtm_google_scholar_user_id">Google Scholar User ID</label></th>
                     <td>
                         <input type="text" id="rtm_google_scholar_user_id" name="rtm_google_scholar_user_id" value="<?php echo esc_attr($user_id); ?>" class="regular-text" />
-                        <p class="description">Enter the user ID from Google Scholar profile URL (e.g., m0_aWlQAAAAJ)</p>
+                        <p class="description">Enter the user ID from a Google Scholar profile URL (e.g., m0_aWlQAAAAJ)</p>
                         <?php if ($user_id): ?>
                             <p><a href="https://scholar.google.com/citations?user=<?php echo esc_attr($user_id); ?>" target="_blank" class="button button-secondary">View Profile</a></p>
                         <?php endif; ?>
                     </td>
                 </tr>
             </table>
-            
             <?php submit_button(); ?>
         </form>
-        
-        <div style="margin-top: 30px; padding: 20px; background: #fff; border: 1px solid #ccd0d4;">
-            <h3>Test Connection</h3>
-            <p>Current User ID: <strong><?php echo esc_html($user_id); ?></strong></p>
-            <button type="button" onclick="testScholarConnection()" class="button button-secondary">Test Scholar Connection</button>
-            <div id="test-results"></div>
-        </div>
-        
-        <script>
-        function testScholarConnection() {
-            document.getElementById('test-results').innerHTML = '<p>Testing connection...</p>';
-            // In production, this would make an AJAX call
-            setTimeout(function() {
-                document.getElementById('test-results').innerHTML = '<div class="notice notice-success"><p>Connection test would run here with AJAX.</p></div>';
-            }, 1000);
+    </div>
+    <?php
+}
+
+// Scholar Settings — manage every team's Scholar ID in one table (multiple mode).
+function rtm_scholar_settings_page_multi() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'rtm_publications';
+
+    if (isset($_POST['submit']) && check_admin_referer('rtm_save_team_scholar', 'rtm_team_scholar_nonce')) {
+        $ids = isset($_POST['rtm_team_scholar']) && is_array($_POST['rtm_team_scholar']) ? wp_unslash($_POST['rtm_team_scholar']) : array();
+        foreach ($ids as $term_id => $value) {
+            $term_id = (int) $term_id;
+            $value   = sanitize_text_field($value);
+            if ($value === '') {
+                delete_term_meta($term_id, 'rtm_team_scholar_id');
+            } else {
+                update_term_meta($term_id, 'rtm_team_scholar_id', $value);
+            }
         }
-        </script>
+        update_option('rtm_google_scholar_user_id', sanitize_text_field(wp_unslash($_POST['rtm_google_scholar_user_id'] ?? '')));
+        echo '<div class="notice notice-success"><p>' . esc_html__('Scholar IDs saved.', 'research-team-manager') . '</p></div>';
+    }
+
+    $teams    = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'orderby' => 'name'));
+    if (is_wp_error($teams)) {
+        $teams = array();
+    }
+    $fallback = get_option('rtm_google_scholar_user_id', '');
+    $pubs_url = admin_url('edit.php?post_type=rtm_team_member&page=rtm-publications');
+    ?>
+    <div class="wrap">
+        <h1><?php esc_html_e('Google Scholar Settings', 'research-team-manager'); ?></h1>
+        <p class="description"><?php esc_html_e('Each team has its own Google Scholar profile. Set every team’s Scholar ID here, then sync each team’s publications from the Publications screen.', 'research-team-manager'); ?></p>
+
+        <form method="post" action="">
+            <?php wp_nonce_field('rtm_save_team_scholar', 'rtm_team_scholar_nonce'); ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Team', 'research-team-manager'); ?></th>
+                        <th><?php esc_html_e('Google Scholar ID', 'research-team-manager'); ?></th>
+                        <th style="width:90px;"><?php esc_html_e('Publications', 'research-team-manager'); ?></th>
+                        <th style="width:160px;"><?php esc_html_e('Actions', 'research-team-manager'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($teams)): ?>
+                        <tr><td colspan="4"><?php esc_html_e('No teams yet.', 'research-team-manager'); ?></td></tr>
+                    <?php else: foreach ($teams as $team):
+                        $sid   = get_term_meta($team->term_id, 'rtm_team_scholar_id', true);
+                        $count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE team_id = %d", $team->term_id));
+                    ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($team->name); ?></strong></td>
+                            <td><input type="text" class="regular-text" name="rtm_team_scholar[<?php echo (int) $team->term_id; ?>]" value="<?php echo esc_attr($sid); ?>" placeholder="<?php esc_attr_e('e.g. m0_aWlQAAAAJ', 'research-team-manager'); ?>" /></td>
+                            <td><?php echo esc_html(number_format_i18n($count)); ?></td>
+                            <td>
+                                <?php if ($sid): ?>
+                                    <a href="https://scholar.google.com/citations?user=<?php echo esc_attr($sid); ?>" target="_blank" rel="noopener">Profile</a> ·
+                                <?php endif; ?>
+                                <a href="<?php echo esc_url(add_query_arg('rtm_team', $team->term_id, $pubs_url)); ?>"><?php esc_html_e('Sync', 'research-team-manager'); ?></a>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+
+            <h2 style="margin-top:2em;"><?php esc_html_e('Fallback Scholar ID', 'research-team-manager'); ?></h2>
+            <p class="description"><?php esc_html_e('Used only for teams that have no Scholar ID of their own.', 'research-team-manager'); ?></p>
+            <input type="text" class="regular-text" name="rtm_google_scholar_user_id" value="<?php echo esc_attr($fallback); ?>" placeholder="<?php esc_attr_e('(optional)', 'research-team-manager'); ?>" />
+
+            <?php submit_button(__('Save Scholar IDs', 'research-team-manager')); ?>
+        </form>
     </div>
     <?php
 }
@@ -1021,6 +1351,91 @@ function rtm_save_team_member_meta($post_id) {
     }
 }
 
+/* -------------------------------------------------------------------------
+ * Multi-team admin: make managing members team-centric.
+ * All of this is gated behind multiple-teams mode (the team UI is hidden in
+ * single mode), so single-team installs are unaffected.
+ * ---------------------------------------------------------------------- */
+
+// Filter the Team Members list by team.
+add_action('restrict_manage_posts', 'rtm_member_team_filter');
+function rtm_member_team_filter($post_type) {
+    if ($post_type !== 'rtm_team_member' || !rtm_is_multiple_teams()) {
+        return;
+    }
+    $tax = 'rtm_research_team';
+    wp_dropdown_categories(array(
+        'show_option_all' => __('All teams', 'research-team-manager'),
+        'taxonomy'        => $tax,
+        'name'            => $tax,
+        'value_field'     => 'slug',
+        'selected'        => isset($_GET[$tax]) ? sanitize_text_field(wp_unslash($_GET[$tax])) : '',
+        'hierarchical'    => true,
+        'hide_empty'      => false,
+        'show_count'      => true,
+        'orderby'         => 'name',
+    ));
+}
+
+// Replace the default "Teams" checklist with a prominent, high-priority
+// "Research Team" box, and let new members be pre-assigned via ?rtm_team=ID.
+add_action('add_meta_boxes_rtm_team_member', 'rtm_member_team_metabox');
+function rtm_member_team_metabox() {
+    if (!rtm_is_multiple_teams()) {
+        return;
+    }
+    remove_meta_box('rtm_research_teamdiv', 'rtm_team_member', 'side');
+    add_meta_box('rtm_member_team', __('Research Team', 'research-team-manager'), 'rtm_member_team_metabox_cb', 'rtm_team_member', 'side', 'high');
+}
+function rtm_member_team_metabox_cb($post) {
+    $terms = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'orderby' => 'name'));
+    if (empty($terms) || is_wp_error($terms)) {
+        printf(
+            '<p>%s</p>',
+            sprintf(
+                /* translators: %s: add-team URL */
+                wp_kses_post(__('No teams yet. <a href="%s">Add a team</a> first.', 'research-team-manager')),
+                esc_url(admin_url('edit-tags.php?taxonomy=rtm_research_team&post_type=rtm_team_member'))
+            )
+        );
+        return;
+    }
+
+    $assigned = wp_get_object_terms($post->ID, 'rtm_research_team', array('fields' => 'ids'));
+    if (is_wp_error($assigned)) {
+        $assigned = array();
+    }
+    // Pre-select when adding from a team ("Add member" action).
+    $preselect = isset($_GET['rtm_team']) ? (int) $_GET['rtm_team'] : 0;
+    if ($preselect && !in_array($preselect, $assigned, true)) {
+        $assigned[] = $preselect;
+    }
+
+    echo '<p class="description">' . esc_html__('Which research team(s) does this member belong to?', 'research-team-manager') . '</p>';
+    // Hidden 0 lets WordPress clear all teams when none are ticked.
+    echo '<input type="hidden" name="tax_input[rtm_research_team][]" value="0" />';
+    echo '<div style="max-height:260px; overflow:auto; border:1px solid #dcdcde; border-radius:4px; padding:8px 10px;">';
+    foreach ($terms as $t) {
+        printf(
+            '<label style="display:block; margin:4px 0;"><input type="checkbox" name="tax_input[rtm_research_team][]" value="%d" %s /> %s</label>',
+            (int) $t->term_id,
+            checked(in_array((int) $t->term_id, array_map('intval', $assigned), true), true, false),
+            esc_html($t->name)
+        );
+    }
+    echo '</div>';
+}
+
+// "Add member" row action on each team in the Teams list.
+add_filter('rtm_research_team_row_actions', 'rtm_team_add_member_action', 10, 2);
+function rtm_team_add_member_action($actions, $term) {
+    if (rtm_is_multiple_teams()) {
+        $url = admin_url('post-new.php?post_type=rtm_team_member&rtm_team=' . (int) $term->term_id);
+        $actions['rtm_add_member'] = '<a href="' . esc_url($url) . '">' . esc_html__('Add member', 'research-team-manager') . '</a>';
+    }
+    return $actions;
+}
+
 // Register shortcodes
 add_shortcode('rtm_team_members', 'rtm_team_members_shortcode');
 function rtm_team_members_shortcode($atts) {
@@ -1215,12 +1630,19 @@ function rtm_get_team_header_html($team_id) {
         return '';
     }
 
-    $pi       = get_term_meta($team_id, 'rtm_team_pi', true);
+    $pi        = get_term_meta($team_id, 'rtm_team_pi', true);
+    $lead_type = get_term_meta($team_id, 'rtm_team_lead_type', true);
+    $type     = get_term_meta($team_id, 'rtm_team_type', true);
+    $theme    = get_term_meta($team_id, 'rtm_team_theme', true);
     $intro    = get_term_meta($team_id, 'rtm_team_intro', true);
     $email    = get_term_meta($team_id, 'rtm_team_contact_email', true);
     $website  = get_term_meta($team_id, 'rtm_team_website', true);
+    $link_type = get_term_meta($team_id, 'rtm_team_link_type', true);
     $location = get_term_meta($team_id, 'rtm_team_location', true);
     $logo_id  = (int) get_term_meta($team_id, 'rtm_team_logo', true);
+
+    $themes      = function_exists('rtm_team_themes') ? rtm_team_themes() : array();
+    $theme_label = ($theme && isset($themes[$theme])) ? $themes[$theme] : '';
 
     ob_start();
     ?>
@@ -1229,9 +1651,31 @@ function rtm_get_team_header_html($team_id) {
             <div class="rtm-team-logo"><?php echo wp_get_attachment_image($logo_id, 'medium'); ?></div>
         <?php endif; ?>
         <div class="rtm-team-header-body">
+            <?php if ($type || $theme_label): ?>
+                <p class="rtm-team-eyebrow">
+                    <?php if ($type): ?><span class="rtm-team-type"><?php echo esc_html($type); ?></span><?php endif; ?>
+                    <?php if ($theme_label): ?><span class="rtm-team-theme"><?php echo esc_html($theme_label); ?></span><?php endif; ?>
+                </p>
+            <?php endif; ?>
             <h1 class="rtm-team-title"><?php echo esc_html($term->name); ?></h1>
-            <?php if ($pi): ?>
-                <p class="rtm-team-pi"><strong><?php esc_html_e('Principal Investigator:', 'research-team-manager'); ?></strong> <?php echo esc_html($pi); ?></p>
+            <?php
+            $lead_ids = rtm_get_team_lead_ids($team_id);
+            if ($lead_type !== 'org' && $lead_ids):
+                $links = array();
+                foreach ($lead_ids as $lid) {
+                    $name = get_the_title($lid);
+                    if ($name) {
+                        $links[] = '<a href="' . esc_url(get_permalink($lid)) . '">' . esc_html($name) . '</a>';
+                    }
+                }
+                if ($links):
+                    $label = _n('Principal Investigator:', 'Principal Investigators:', count($links), 'research-team-manager');
+                    ?>
+                    <p class="rtm-team-pi"><strong><?php echo esc_html($label); ?></strong> <?php echo implode(', ', $links); ?></p>
+                    <?php
+                endif;
+            elseif ($pi): ?>
+                <p class="rtm-team-pi"><strong><?php echo esc_html($lead_type === 'org' ? __('Led by:', 'research-team-manager') : __('Principal Investigator:', 'research-team-manager')); ?></strong> <?php echo esc_html($pi); ?></p>
             <?php endif; ?>
             <?php if ($location): ?>
                 <p class="rtm-team-location"><?php echo esc_html($location); ?></p>
@@ -1247,7 +1691,7 @@ function rtm_get_team_header_html($team_id) {
                         <a href="mailto:<?php echo esc_attr($email); ?>"><?php echo esc_html($email); ?></a>
                     <?php endif; ?>
                     <?php if ($website): ?>
-                        <a href="<?php echo esc_url($website); ?>" target="_blank" rel="noopener"><?php esc_html_e('Website', 'research-team-manager'); ?></a>
+                        <a href="<?php echo esc_url($website); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(rtm_team_link_label($link_type)); ?> <?php echo rtm_ui_icon('external'); ?></a>
                     <?php endif; ?>
                 </p>
             <?php endif; ?>
@@ -1263,6 +1707,156 @@ add_shortcode('rtm_team_header', 'rtm_team_header_shortcode');
 function rtm_team_header_shortcode($atts) {
     $atts = shortcode_atts(array('team' => ''), $atts);
     return rtm_get_team_header_html(rtm_resolve_team_id($atts['team']));
+}
+
+/**
+ * [rtm_team_roster] — the team's members for the current (or given) team.
+ * Renders a heading + member grid only when the team has members; outputs
+ * nothing at all when empty, so the section disappears.
+ */
+add_shortcode('rtm_team_roster', 'rtm_team_roster_shortcode');
+function rtm_team_roster_shortcode($atts) {
+    $atts = shortcode_atts(array('team' => '', 'heading' => 'Lab Team', 'group_by' => ''), $atts);
+    $team_id = rtm_resolve_team_id($atts['team']);
+    if (!$team_id) {
+        return '';
+    }
+
+    $members = get_posts(array(
+        'post_type'      => 'rtm_team_member',
+        'post_status'    => 'publish',
+        'numberposts'    => -1,
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'tax_query'      => array(array(
+            'taxonomy' => 'rtm_research_team',
+            'field'    => 'term_id',
+            'terms'    => $team_id,
+        )),
+    ));
+    if (empty($members)) {
+        return ''; // no members — hide the whole section
+    }
+
+    // Resolve grouping: explicit attr → the team's setting → default (by status).
+    $group_by = $atts['group_by'];
+    if ($group_by === '') {
+        $group_by = get_term_meta($team_id, 'rtm_team_roster_group', true);
+        if ($group_by === '') {
+            $group_by = 'rtm_member_status';
+        }
+    }
+    $group_tax = in_array($group_by, array('rtm_member_status', 'rtm_team_role'), true) ? $group_by : '';
+
+    ob_start();
+    if (!empty($atts['heading'])) {
+        echo '<h2 class="rtm-section-title">' . esc_html($atts['heading']) . '</h2>';
+    }
+
+    if (!$group_tax) {
+        echo rtm_render_member_grid($members);
+    } else {
+        // Split into the chosen taxonomy's terms. Members with no term render
+        // first (unlabelled); each term with members gets its own subheading.
+        $ungrouped = array();
+        $groups = array(); // term_id => ['name'=>, 'members'=>[]]
+        foreach ($members as $m) {
+            $terms = get_the_terms($m->ID, $group_tax);
+            if (!$terms || is_wp_error($terms)) {
+                $ungrouped[] = $m;
+                continue;
+            }
+            foreach ($terms as $t) {
+                if (!isset($groups[$t->term_id])) {
+                    $groups[$t->term_id] = array('name' => $t->name, 'members' => array());
+                }
+                $groups[$t->term_id]['members'][] = $m;
+            }
+        }
+        // Order groups by name, but push "alumni/former" sections to the end.
+        uasort($groups, function ($a, $b) {
+            $aa = (stripos($a['name'], 'alumni') !== false || stripos($a['name'], 'former') !== false);
+            $bb = (stripos($b['name'], 'alumni') !== false || stripos($b['name'], 'former') !== false);
+            if ($aa !== $bb) {
+                return $aa ? 1 : -1;
+            }
+            return strcasecmp($a['name'], $b['name']);
+        });
+
+        echo rtm_render_member_grid($ungrouped);
+        foreach ($groups as $g) {
+            echo '<h3 class="rtm-roster-group">' . esc_html($g['name']) . '</h3>';
+            echo rtm_render_member_grid($g['members']);
+        }
+    }
+
+    return ob_get_clean();
+}
+
+/**
+ * Render a grid of member cards (leads first, then alphabetical).
+ *
+ * @param WP_Post[] $members
+ * @return string
+ */
+function rtm_render_member_grid($members) {
+    if (empty($members)) {
+        return '';
+    }
+    // Leads first, then by title.
+    usort($members, function ($a, $b) {
+        $al = get_post_meta($a->ID, '_rtm_is_lead', true) ? 1 : 0;
+        $bl = get_post_meta($b->ID, '_rtm_is_lead', true) ? 1 : 0;
+        if ($al !== $bl) {
+            return $bl - $al;
+        }
+        return strcasecmp(get_the_title($a->ID), get_the_title($b->ID));
+    });
+
+    ob_start();
+    echo '<div class="rtm-team-members rtm-team-grid">';
+    foreach ($members as $m) {
+        $pid      = $m->ID;
+        $url      = get_permalink($pid);
+        $position = get_post_meta($pid, '_rtm_position', true);
+        $is_lead  = (bool) get_post_meta($pid, '_rtm_is_lead', true);
+        ?>
+        <div class="rtm-team-member">
+            <?php if (has_post_thumbnail($pid)): ?>
+                <div class="rtm-member-photo"><a href="<?php echo esc_url($url); ?>"><?php echo get_the_post_thumbnail($pid, 'medium', array('class' => 'rtm-member-image')); ?></a></div>
+            <?php endif; ?>
+            <div class="rtm-member-content">
+                <h3 class="rtm-member-name"><a href="<?php echo esc_url($url); ?>"><?php echo esc_html(get_the_title($pid)); ?></a></h3>
+                <?php if ($is_lead): ?>
+                    <span class="rtm-member-lead"><?php esc_html_e('Principal Investigator', 'research-team-manager'); ?></span>
+                <?php elseif ($position): ?>
+                    <div class="rtm-member-position"><?php echo esc_html($position); ?></div>
+                <?php endif; ?>
+                <a class="rtm-member-link" href="<?php echo esc_url($url); ?>"><?php esc_html_e('View profile', 'research-team-manager'); ?></a>
+            </div>
+        </div>
+        <?php
+    }
+    echo '</div>';
+    return ob_get_clean();
+}
+
+/**
+ * [rtm_team_publications] — the team's publications with a heading, shown only
+ * when there are publications; outputs nothing when empty.
+ */
+add_shortcode('rtm_team_publications', 'rtm_team_publications_shortcode');
+function rtm_team_publications_shortcode($atts) {
+    $atts = shortcode_atts(array('team' => '', 'heading' => 'Publications'), $atts);
+    $inner = rtm_sorted_publications_shortcode(array('team' => $atts['team']));
+    if (trim($inner) === '') {
+        return '';
+    }
+    $out = '';
+    if (!empty($atts['heading'])) {
+        $out .= '<h2 class="rtm-section-title">' . esc_html($atts['heading']) . '</h2>';
+    }
+    return $out . $inner;
 }
 
 /**
@@ -1286,8 +1880,9 @@ function rtm_get_team_icon_svg($key) {
  */
 function rtm_ui_icon($name) {
     $icons = array(
-        'chevron' => '<polyline points="9 6 15 12 9 18"/>',
-        'search'  => '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>',
+        'chevron'  => '<polyline points="9 6 15 12 9 18"/>',
+        'search'   => '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>',
+        'external' => '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
         'sun'     => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
         'moon'    => '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
     );
@@ -1313,41 +1908,34 @@ function rtm_teams_shortcode($atts) {
         return '<p>' . esc_html__('No teams found.', 'research-team-manager') . '</p>';
     }
 
-    $by_parent = array();
-    $top = array();
+    // Group labs by their Research Theme field (rtm_team_theme), in the order
+    // defined by rtm_team_themes(); anything unthemed falls into "Other".
+    $themes = rtm_team_themes();
+    $short  = rtm_team_theme_short_labels();
+    $by_theme = array();
     foreach ($all as $t) {
-        $by_parent[$t->parent][] = $t;
-        if ((int) $t->parent === 0) {
-            $top[] = $t;
+        $theme = get_term_meta($t->term_id, 'rtm_team_theme', true);
+        if (!$theme || !isset($themes[$theme])) {
+            $theme = 'other';
         }
+        $by_theme[$theme][] = $t;
     }
 
-    // Short chip labels for the known themes; fall back to the full name.
-    $short = array(
-        'physical-sciences-engineering'     => __('Physical Sciences', 'research-team-manager'),
-        'natural-resources-environment'     => __('Natural Resources', 'research-team-manager'),
-        'health-human-development'          => __('Health', 'research-team-manager'),
-        'interdisciplinary-data-innovation' => __('Interdisciplinary', 'research-team-manager'),
-    );
-
-    // Build theme groups (parents with children); collect standalone labs.
     $groups = array();
-    $standalone = array();
-    foreach ($top as $t) {
-        if (!empty($by_parent[$t->term_id])) {
-            $groups[] = array(
-                'slug'  => $t->slug,
-                'name'  => $t->name,
-                'short' => isset($short[$t->slug]) ? $short[$t->slug] : $t->name,
-                'desc'  => $t->description,
-                'terms' => $by_parent[$t->term_id],
-            );
-        } else {
-            $standalone[] = $t;
+    foreach ($themes as $slug => $label) {
+        if (empty($by_theme[$slug])) {
+            continue;
         }
+        $groups[] = array(
+            'slug'  => $slug,
+            'name'  => $label,
+            'short' => isset($short[$slug]) ? $short[$slug] : $label,
+            'desc'  => '',
+            'terms' => $by_theme[$slug],
+        );
     }
-    if (!empty($standalone)) {
-        $groups[] = array('slug' => 'other', 'name' => __('Other', 'research-team-manager'), 'short' => __('Other', 'research-team-manager'), 'desc' => '', 'terms' => $standalone);
+    if (!empty($by_theme['other'])) {
+        $groups[] = array('slug' => 'other', 'name' => __('Other', 'research-team-manager'), 'short' => __('Other', 'research-team-manager'), 'desc' => '', 'terms' => $by_theme['other']);
     }
 
     $total = 0;
@@ -1411,16 +1999,22 @@ function rtm_render_team_cards($terms, $atts) {
         if (is_wp_error($link)) {
             $link = '#';
         }
-        $pi      = get_term_meta($t->term_id, 'rtm_team_pi', true);
+        $pi      = rtm_team_lead_text($t->term_id);
+        $type    = get_term_meta($t->term_id, 'rtm_team_type', true);
         $intro   = get_term_meta($t->term_id, 'rtm_team_intro', true);
         $logo_id = (int) get_term_meta($t->term_id, 'rtm_team_logo', true);
+        $website = get_term_meta($t->term_id, 'rtm_team_website', true);
+        $link_type = get_term_meta($t->term_id, 'rtm_team_link_type', true);
         $source  = $intro ? $intro : $t->description;
         $excerpt = $source ? wp_trim_words(wp_strip_all_tags($source), 24) : '';
-        $search  = strtolower(wp_strip_all_tags($t->name . ' ' . $pi));
+        $search  = strtolower(wp_strip_all_tags($t->name . ' ' . $pi . ' ' . $type));
         ?>
         <article class="rtm-lab-card" data-search="<?php echo esc_attr($search); ?>">
             <?php if ($logo_id): ?>
                 <span class="rtm-lab-card__logo-wrap"><?php echo wp_get_attachment_image($logo_id, 'thumbnail', false, array('class' => 'rtm-lab-card__logo')); ?></span>
+            <?php endif; ?>
+            <?php if ($type): ?>
+                <span class="rtm-lab-card__type"><?php echo esc_html($type); ?></span>
             <?php endif; ?>
             <h3 class="rtm-lab-card__title"><?php echo esc_html($t->name); ?></h3>
             <?php if ($show_pi && $pi): ?>
@@ -1429,7 +2023,12 @@ function rtm_render_team_cards($terms, $atts) {
             <?php if ($excerpt): ?>
                 <p class="rtm-lab-card__desc"><?php echo esc_html($excerpt); ?></p>
             <?php endif; ?>
-            <span class="rtm-lab-card__cta"><?php esc_html_e('View team', 'research-team-manager'); ?> <?php echo rtm_ui_icon('chevron'); ?></span>
+            <span class="rtm-lab-card__actions">
+                <span class="rtm-lab-card__cta"><?php esc_html_e('View team', 'research-team-manager'); ?> <?php echo rtm_ui_icon('chevron'); ?></span>
+                <?php if ($website): ?>
+                    <a class="rtm-lab-card__site" href="<?php echo esc_url($website); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(rtm_team_link_label($link_type, true)); ?> <?php echo rtm_ui_icon('external'); ?></a>
+                <?php endif; ?>
+            </span>
             <a class="rtm-lab-card__link" href="<?php echo esc_url($link); ?>" aria-label="<?php echo esc_attr(sprintf(__('View %s', 'research-team-manager'), $t->name)); ?>"></a>
         </article>
         <?php
@@ -1634,9 +2233,9 @@ function rtm_sorted_publications_shortcode($atts) {
     }
 
     if (empty($publications)) {
-        return '<p>No publications available.</p>';
+        return ''; // nothing to show — let the section hide itself
     }
-    
+
     // Group publications by year
     $publications_by_year = array();
     foreach ($publications as $pub) {

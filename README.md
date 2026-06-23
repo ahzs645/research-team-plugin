@@ -52,20 +52,26 @@ Go to **Team Members → Team Settings** and pick:
 
 After switching modes the plugin re-flushes permalinks automatically.
 
+> **📖 Full walkthrough:** see [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the complete admin & front‑end guide (modes, team fields, members, publications, shortcodes, and the block template).
+
 ### Adding a lab
-1. **Team Members → Teams → Add New** — name the lab (e.g. *Robotics Lab*). Its page is created automatically at `/research-team/{slug}/`.
+1. **Research Labs → Teams → Add New** — name the lab (e.g. *Robotics Lab*). Its page is created automatically at `/research-team/{slug}/`.
 2. Fill in the per-lab settings on the term:
-   - **Principal Investigator**, **Team Logo** (media picker), **Intro** (rich text)
-   - **Google Scholar ID** — scopes this lab's publications
-   - **Contact Email**, **Website**, **Location**
-3. When editing a team member, tick the **Teams** box(es) for the lab(s) they belong to (a member can be in more than one lab).
+   - **Type** (Lab / Centre / Institute / …) and **Research Theme** (discipline grouping used by the directory)
+   - **Lead type** — *Individual* (then search & click to add the **PI member(s)**) or *Organization* (a name)
+   - **Team Logo**, **Intro**, **Google Scholar ID**, **Contact Email**, **Website + Link label**, **Location**
+   - **Group members by** — None / Member status (Current, Alumni…) / Team role
+3. When editing a team member, use the prominent **Research Team** box to assign the lab(s) — or click **Add member** from a team to start pre‑assigned. A member can belong to several labs.
+
+### Switching modes (guarded conversion)
+**Team Settings** adapts to the current mode: *Single → Multiple* can create a starter team and move existing members into it; *Multiple → Single* lets you pick the **active team** and choose to keep / delete the others (with confirmation). Permalinks re‑flush automatically.
 
 ### Lab pages
-- **Block themes (e.g. Site Editor):** the team archive already lists that lab's members. Build the page in the Site Editor and add `[rtm_team_header]` for the lab's logo/PI/intro, a **Query Loop** filtered to the team for members, and `[sorted_publications]` for the lab's papers. (All three auto-detect the current team on a team archive.)
-- **Classic themes:** the bundled `templates/taxonomy-rtm_research_team.php` renders the full lab page (header + members + publications) automatically; copy it into your theme to customise.
+- **Block themes:** add `templates/taxonomy-rtm_research_team.html` (see the guide) composed of `[rtm_team_header]` + `[rtm_team_roster]` + `[rtm_team_publications]`. Empty sections self‑hide.
+- **Classic themes:** the bundled `templates/taxonomy-rtm_research_team.php` renders the full lab page automatically.
 
-### Per-lab publications
-Each lab has its own **Google Scholar ID** (set on the team). On **Team Members → Publications**, choose a **Team** to scope the list, **Sync** and **Import**; rows are stored against that team and shown only on that lab's page. In single mode (or with no team selected) the global Scholar ID and shared list are used.
+### Per-lab publications & Scholar IDs
+**Scholar Settings** shows a table of every team with its own Scholar ID. **Publications** lets you pick a team to view/sync/import *its* papers (Sync/Import appear only when a team is selected). In single mode both collapse to one global ID + list.
 
 ## 📋 Requirements
 
@@ -175,11 +181,24 @@ Enhanced sorting options for Query Loop blocks:
 - `author_filter` - Filter by specific author
 - `year_filter` - Filter by publication year
 
+### Labs directory
+```shortcode
+[rtm_teams]
+```
+A filterable directory of all labs grouped by **Research Theme**, with theme filter chips, search (name / PI / type), a Type badge, the PI/organization, and an "Official site" link per card. Used on the `/labs` page.
+
 ### Team Header (lab page)
 ```shortcode
 [rtm_team_header team="robotics-lab"]
 ```
-Outputs a lab's logo, name, Principal Investigator, intro and contact details from the team's settings. Omit `team` on a team archive to auto-detect the current lab. Pair with a Query Loop (filtered to the team) and `[sorted_publications]` to compose a full lab page in the Site Editor.
+Outputs a lab's logo, type · theme, name, **PI member(s) linked to their profiles** (or organization), intro, contact and website link from the team's settings. Omit `team` on a team archive to auto-detect the current lab.
+
+### Lab roster & publications sections (self-hiding)
+```shortcode
+[rtm_team_roster team="robotics-lab"]        — "Lab Team", grouped per the team's setting (e.g. Alumni separated); leads first
+[rtm_team_publications team="robotics-lab"]  — "Publications" for the team
+```
+Both render their own heading and output **nothing when empty**, so a lab with no members/papers shows just the hero. `group_by` on the roster overrides the team's setting (`none` / `rtm_member_status` / `rtm_team_role`).
 
 ### Publications Grouped by Year
 ```shortcode
@@ -322,6 +341,16 @@ For support and questions:
 - Submit issues with detailed information
 
 ## 📈 Changelog
+
+### Version 1.2.0
+- **Team classifiers**: per-team **Type** (Lab/Centre/Institute/…) and **Research Theme**; the `/labs` directory now groups by Theme and shows a Type badge.
+- **Structured lead**: PI is now real member post(s) chosen via a **search + click-to-add** picker (linked to their profiles), or an **Organization** name; auto-shows "Principal Investigator(s):" vs "Led by:".
+- **Roster grouping**: per-team **Group members by** (none / member status / team role) — e.g. Alumni split into their own section; leads sorted first with a PI badge. New status/role terms become sections automatically.
+- **Team-aware admin**: Teams column + filter on the member list, a prominent **Research Team** box on the member editor, and **Add member** from each team.
+- **Guarded mode conversion**: Team Settings pipeline for single→multiple (starter team + move members) and multiple→single (choose active team; keep / delete others, with confirmation).
+- **Per-team Scholar/Publications**: Scholar Settings is a table of all teams' Scholar IDs; Publications scopes sync/import to a selected team.
+- **Website link label** (Official site vs More information) + deep `#anchor` support.
+- Added [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md); front-end CSS inherits the active theme's light/dark variables.
 
 ### Version 1.1.0
 - **Multiple-teams mode**: model each lab as a `research_team` term with its own page at `/research-team/{slug}/`
