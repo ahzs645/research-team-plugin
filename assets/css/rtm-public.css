@@ -132,7 +132,7 @@
     background: var(--rtm-surface);
     border: 1px solid var(--rtm-border);
     border-radius: var(--rtm-radius);
-    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, border-radius .16s ease;
 }
 .rtm-lab-card::before {
     content: "";
@@ -142,14 +142,15 @@
     border-radius: var(--rtm-radius) 0 0 var(--rtm-radius);
     background: var(--rtm-accent);
     opacity: 0;
-    transition: opacity .16s ease;
+    transition: opacity .16s ease, border-radius .16s ease;
 }
 .rtm-lab-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 14px 36px var(--rtm-shadow);
     border-color: transparent;
+    border-radius: 0;
 }
-.rtm-lab-card:hover::before { opacity: 1; }
+.rtm-lab-card:hover::before { opacity: 1; border-radius: 0; }
 .rtm-lab-card__logo-wrap { display: block; margin-bottom: 4px; }
 .rtm-lab-card__logo { max-height: 48px; width: auto; }
 .rtm-lab-card__title {
@@ -300,4 +301,18 @@ body.tax-rtm_research_team .wp-site-blocks > main,
 body.post-type-archive-rtm_team_member .wp-site-blocks > main,
 body.single-rtm_team_member .wp-site-blocks > main {
     flex: 1 0 auto;
+}
+
+/* ================================================================== */
+/* Dark-mode text on the directory page. The theme sets a hardcoded    */
+/* heading colour via theme.json that doesn't flip with its dark mode, */
+/* so the page title / intro go near-invisible. Re-point them at the   */
+/* theme's flipping text variables when dark mode is active.           */
+/* ================================================================== */
+[data-theme="dark"] .rtm-labs-page .wp-block-post-title {
+    color: var(--text-primary, #e2e8f0);
+}
+[data-theme="dark"] .rtm-labs-page .wp-block-post-content,
+[data-theme="dark"] .rtm-labs-page .wp-block-post-content p {
+    color: var(--text-secondary, #94a3b8);
 }

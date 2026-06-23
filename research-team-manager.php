@@ -1502,6 +1502,19 @@ function rtm_enqueue_public_assets() {
     );
 }
 
+// Tag any singular view that embeds the teams directory so its page title /
+// intro can be made dark-mode aware via CSS (the theme hardcodes heading colour).
+add_filter('body_class', 'rtm_body_class');
+function rtm_body_class($classes) {
+    if (is_singular()) {
+        $post = get_post();
+        if ($post && has_shortcode($post->post_content, 'rtm_teams')) {
+            $classes[] = 'rtm-labs-page';
+        }
+    }
+    return $classes;
+}
+
 /**
  * Use the plugin's bundled templates for team member archives/singulars and lab
  * pages — but only on classic themes, and only when the active theme hasn't
