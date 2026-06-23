@@ -3,6 +3,10 @@
  * Archive Team Members Template
  */
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 get_header(); ?>
 
 <div class="rtm-team-archive">
@@ -19,12 +23,12 @@ get_header(); ?>
         <div class="rtm-team-filters">
             <?php
             $roles = get_terms(array(
-                'taxonomy' => 'team_role',
+                'taxonomy' => 'rtm_team_role',
                 'hide_empty' => true,
             ));
             
             $research_areas = get_terms(array(
-                'taxonomy' => 'research_area',
+                'taxonomy' => 'rtm_research_area',
                 'hide_empty' => true,
             ));
             ?>
@@ -82,8 +86,8 @@ get_header(); ?>
         <div class="rtm-team-members rtm-team-grid rtm-grid-3" id="rtm-team-container">
             <?php while (have_posts()): the_post(); ?>
                 <?php
-                $post_roles = wp_get_post_terms(get_the_ID(), 'team_role', array('fields' => 'slugs'));
-                $post_areas = wp_get_post_terms(get_the_ID(), 'research_area', array('fields' => 'slugs'));
+                $post_roles = wp_get_post_terms(get_the_ID(), 'rtm_team_role', array('fields' => 'slugs'));
+                $post_areas = wp_get_post_terms(get_the_ID(), 'rtm_research_area', array('fields' => 'slugs'));
                 
                 $data_roles = implode(' ', $post_roles);
                 $data_areas = implode(' ', $post_areas);
@@ -129,8 +133,8 @@ get_header(); ?>
                         
                         <div class="rtm-member-taxonomies">
                             <?php
-                            $roles = get_the_terms(get_the_ID(), 'team_role');
-                            $areas = get_the_terms(get_the_ID(), 'research_area');
+                            $roles = get_the_terms(get_the_ID(), 'rtm_team_role');
+                            $areas = get_the_terms(get_the_ID(), 'rtm_research_area');
                             ?>
                             
                             <?php if ($roles && !is_wp_error($roles)): ?>

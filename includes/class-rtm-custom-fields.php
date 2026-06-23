@@ -19,7 +19,7 @@ class RTM_Custom_Fields {
             'rtm_team_member_dates',
             __('Team Member Dates & Priority', 'research-team-manager'),
             array($this, 'team_member_dates_callback'),
-            'team_member',
+            'rtm_team_member',
             'normal',
             'high'
         );
@@ -198,7 +198,7 @@ class RTM_Custom_Fields {
             return;
         }
         
-        if (isset($_POST['post_type']) && 'team_member' == $_POST['post_type']) {
+        if (isset($_POST['post_type']) && 'rtm_team_member' == $_POST['post_type']) {
             if (!current_user_can('edit_post', $post_id)) {
                 return;
             }
@@ -215,7 +215,7 @@ class RTM_Custom_Fields {
         
         foreach ($fields as $field => $sanitize_function) {
             if (isset($_POST[$field])) {
-                $value = call_user_func($sanitize_function, $_POST[$field]);
+                $value = call_user_func($sanitize_function, wp_unslash($_POST[$field]));
                 update_post_meta($post_id, '_' . $field, $value);
             }
         }

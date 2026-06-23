@@ -12,7 +12,7 @@ class RTM_REST_API {
     public function __construct() {
         add_action('init', array($this, 'register_meta_fields'));
         add_action('rest_api_init', array($this, 'register_rest_fields'));
-        add_filter('rest_team_member_query', array($this, 'modify_rest_query'), 10, 2);
+        add_filter('rest_rtm_team_member_query', array($this, 'modify_rest_query'), 10, 2);
         add_action('pre_get_posts', array($this, 'modify_query_orderby'));
         add_filter('query_loop_block_query_vars', array($this, 'modify_query_loop_vars'), 10, 3);
         add_action('enqueue_block_editor_assets', array($this, 'enqueue_editor_modifications'));
@@ -59,7 +59,7 @@ class RTM_REST_API {
         );
         
         foreach ($meta_fields as $meta_key => $args) {
-            register_post_meta('team_member', $meta_key, $args);
+            register_post_meta('rtm_team_member', $meta_key, $args);
         }
     }
     
@@ -68,7 +68,7 @@ class RTM_REST_API {
      */
     public function register_rest_fields() {
         // Add computed fields for easier access
-        register_rest_field('team_member', 'joined_date', array(
+        register_rest_field('rtm_team_member', 'joined_date', array(
             'get_callback' => function($post) {
                 return get_post_meta($post['id'], '_rtm_start_date', true);
             },
@@ -78,7 +78,7 @@ class RTM_REST_API {
             ),
         ));
         
-        register_rest_field('team_member', 'left_date', array(
+        register_rest_field('rtm_team_member', 'left_date', array(
             'get_callback' => function($post) {
                 return get_post_meta($post['id'], '_rtm_end_date', true);
             },
@@ -88,7 +88,7 @@ class RTM_REST_API {
             ),
         ));
         
-        register_rest_field('team_member', 'use_date_priority', array(
+        register_rest_field('rtm_team_member', 'use_date_priority', array(
             'get_callback' => function($post) {
                 return (bool) get_post_meta($post['id'], '_rtm_date_priority', true);
             },
@@ -155,12 +155,12 @@ class RTM_REST_API {
      */
     public function modify_query_orderby($query) {
         // Only modify team_member queries on the frontend
-        if (!is_admin() && $query->is_main_query() && $query->get('post_type') === 'team_member') {
+        if (!is_admin() && $query->is_main_query() && $query->get('post_type') === 'rtm_team_member') {
             return;
         }
         
         // Handle block editor queries
-        if (!is_admin() && isset($query->query['post_type']) && $query->query['post_type'] === 'team_member') {
+        if (!is_admin() && isset($query->query['post_type']) && $query->query['post_type'] === 'rtm_team_member') {
             $orderby = $query->get('orderby');
             
             switch($orderby) {
@@ -259,7 +259,7 @@ class RTM_REST_API {
      */
     public function modify_query_loop_vars($query, $block, $page) {
         // Only modify team_member queries
-        if (!isset($query['post_type']) || $query['post_type'] !== 'team_member') {
+        if (!isset($query['post_type']) || $query['post_type'] !== 'rtm_team_member') {
             return $query;
         }
         
@@ -330,7 +330,7 @@ class RTM_REST_API {
                     if (selectedBlock && selectedBlock.name === 'core/query') {
                         const postType = selectedBlock.attributes.query?.postType;
                         
-                        if (postType === 'team_member') {
+                        if (postType === 'rtm_team_member') {
                             // Add a note in console for developers
                             console.log('Team Member Query Block - Available orderBy options:', {
                                 'date': 'Default (Publish Date)',

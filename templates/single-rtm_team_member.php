@@ -3,6 +3,10 @@
  * Single Team Member Template
  */
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 get_header(); ?>
 
 <div class="rtm-single-member">
@@ -33,8 +37,8 @@ get_header(); ?>
                     <?php endif; ?>
                     
                     <?php
-                    $roles = get_the_terms(get_the_ID(), 'team_role');
-                    $areas = get_the_terms(get_the_ID(), 'research_area');
+                    $roles = get_the_terms(get_the_ID(), 'rtm_team_role');
+                    $areas = get_the_terms(get_the_ID(), 'rtm_research_area');
                     ?>
                     
                     <?php if ($roles && !is_wp_error($roles)): ?>
@@ -153,7 +157,7 @@ get_header(); ?>
                                     <?php foreach ($social_links as $platform => $url): ?>
                                         <?php if (!empty($url)): ?>
                                             <a href="<?php echo esc_url($url); ?>" target="_blank" class="rtm-social-link rtm-<?php echo esc_attr($platform); ?>">
-                                                <span class="rtm-social-icon"><?php echo $this->get_social_icon($platform); ?></span>
+                                                <span class="rtm-social-icon"><?php echo get_social_icon($platform); ?></span>
                                                 <span class="rtm-social-label"><?php echo esc_html(ucfirst(str_replace('_', ' ', $platform))); ?></span>
                                             </a>
                                         <?php endif; ?>
@@ -167,8 +171,8 @@ get_header(); ?>
             
             <div class="rtm-member-navigation">
                 <?php
-                $prev_post = get_previous_post(true, '', 'team_role');
-                $next_post = get_next_post(true, '', 'team_role');
+                $prev_post = get_previous_post(true, '', 'rtm_team_role');
+                $next_post = get_next_post(true, '', 'rtm_team_role');
                 ?>
                 
                 <?php if ($prev_post || $next_post): ?>
@@ -194,7 +198,7 @@ get_header(); ?>
                 <?php endif; ?>
                 
                 <div class="rtm-back-to-team">
-                    <a href="<?php echo get_post_type_archive_link('team_member'); ?>" class="rtm-back-link">
+                    <a href="<?php echo get_post_type_archive_link('rtm_team_member'); ?>" class="rtm-back-link">
                         <?php _e('← Back to Team', 'research-team-manager'); ?>
                     </a>
                 </div>
@@ -204,17 +208,19 @@ get_header(); ?>
 </div>
 
 <?php
-function get_social_icon($platform) {
-    $icons = array(
-        'linkedin' => '🔗',
-        'twitter' => '🐦',
-        'google_scholar' => '🎓',
-        'orcid' => '🆔',
-        'researchgate' => '🔬',
-        'github' => '💻',
-    );
-    
-    return isset($icons[$platform]) ? $icons[$platform] : '🌐';
+if (!function_exists('get_social_icon')) {
+    function get_social_icon($platform) {
+        $icons = array(
+            'linkedin' => '🔗',
+            'twitter' => '🐦',
+            'google_scholar' => '🎓',
+            'orcid' => '🆔',
+            'researchgate' => '🔬',
+            'github' => '💻',
+        );
+
+        return isset($icons[$platform]) ? $icons[$platform] : '🌐';
+    }
 }
 ?>
 

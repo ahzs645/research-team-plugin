@@ -2,6 +2,8 @@
 
 A comprehensive WordPress plugin for managing research team members and publications with Google Scholar integration. This plugin provides a complete solution for academic institutions, research groups, and organizations to showcase their team members and track publications.
 
+It runs in **single-team mode** (one lab) or **multiple-teams mode** (a research team page for every lab on campus). See [Multiple Teams (Labs)](#-multiple-teams-labs) below.
+
 ## 🚀 Features
 
 ### 👥 Team Member Management
@@ -38,6 +40,32 @@ A comprehensive WordPress plugin for managing research team members and publicat
 - **Extensible Architecture**: Well-structured OOP codebase
 - **WordPress Standards**: Follows WordPress coding standards and best practices
 - **Translation Ready**: Full internationalization support
+
+## 🏫 Multiple Teams (Labs)
+
+The plugin can run as a multi-lab directory where **each lab is a "Team" term** with its own page, settings and publications.
+
+### Choosing a mode
+Go to **Team Members → Team Settings** and pick:
+- **Multiple teams** *(default)* — adds a **Teams** taxonomy, per-lab settings, per-lab pages and per-lab publications.
+- **Single team** — hides the Teams UI and uses the global Scholar ID / one shared publications list (original behaviour). Optionally pick a *default team* to scope listings to one lab.
+
+After switching modes the plugin re-flushes permalinks automatically.
+
+### Adding a lab
+1. **Team Members → Teams → Add New** — name the lab (e.g. *Robotics Lab*). Its page is created automatically at `/research-team/{slug}/`.
+2. Fill in the per-lab settings on the term:
+   - **Principal Investigator**, **Team Logo** (media picker), **Intro** (rich text)
+   - **Google Scholar ID** — scopes this lab's publications
+   - **Contact Email**, **Website**, **Location**
+3. When editing a team member, tick the **Teams** box(es) for the lab(s) they belong to (a member can be in more than one lab).
+
+### Lab pages
+- **Block themes (e.g. Site Editor):** the team archive already lists that lab's members. Build the page in the Site Editor and add `[rtm_team_header]` for the lab's logo/PI/intro, a **Query Loop** filtered to the team for members, and `[sorted_publications]` for the lab's papers. (All three auto-detect the current team on a team archive.)
+- **Classic themes:** the bundled `templates/taxonomy-rtm_research_team.php` renders the full lab page (header + members + publications) automatically; copy it into your theme to customise.
+
+### Per-lab publications
+Each lab has its own **Google Scholar ID** (set on the team). On **Team Members → Publications**, choose a **Team** to scope the list, **Sync** and **Import**; rows are stored against that team and shown only on that lab's page. In single mode (or with no team selected) the global Scholar ID and shared list are used.
 
 ## 📋 Requirements
 
@@ -124,7 +152,8 @@ Enhanced sorting options for Query Loop blocks:
 **Parameters:**
 - `limit` - Number of members to show (-1 for all)
 - `role` - Filter by specific role slug
-- `research_area` - Filter by research area slug  
+- `research_area` - Filter by research area slug
+- `team` - Filter by a team/lab (slug or term ID). On a team archive it auto-detects the current team.
 - `show_current_only` - Show only current members (true/false)
 - `layout` - Display layout (grid/list)
 - `columns` - Number of columns for grid layout (2-4)
@@ -139,11 +168,24 @@ Enhanced sorting options for Query Loop blocks:
 
 **Parameters:**
 - `limit` - Number of publications to show (-1 for all)
+- `team` - Show only a team/lab's publications (slug or term ID); auto-detects on a team archive
 - `show_citations` - Display citation counts (true/false)
 - `show_abstract` - Show publication abstracts (true/false)
 - `group_by_year` - Group publications by year (true/false)
 - `author_filter` - Filter by specific author
 - `year_filter` - Filter by publication year
+
+### Team Header (lab page)
+```shortcode
+[rtm_team_header team="robotics-lab"]
+```
+Outputs a lab's logo, name, Principal Investigator, intro and contact details from the team's settings. Omit `team` on a team archive to auto-detect the current lab. Pair with a Query Loop (filtered to the team) and `[sorted_publications]` to compose a full lab page in the Site Editor.
+
+### Publications Grouped by Year
+```shortcode
+[sorted_publications team="robotics-lab"]
+```
+Lists publications grouped by year with year navigation. `team` scopes to one lab (slug or ID); auto-detects on a team archive.
 
 ## 🎨 Template Customization
 
@@ -152,8 +194,9 @@ The plugin includes customizable templates that can be overridden in your theme:
 ### Template Files
 1. Copy template files from `plugins/research-team-manager/templates/` to your theme directory
 2. Customize as needed:
-   - `archive-team_member.php` - Team members archive page
-   - `single-team_member.php` - Individual member profile page
+   - `archive-rtm_team_member.php` - Team members archive page
+   - `single-rtm_team_member.php` - Individual member profile page
+   - `taxonomy-rtm_research_team.php` - A single lab/team page
 
 ### Available Template Tags
 - `rtm_get_member_field($field_name)` - Get specific member field
@@ -218,12 +261,12 @@ research-team-manager/
 ```
 
 ### Key Classes
-- `RTM_Post_Types` - Custom post types and taxonomies
 - `RTM_Custom_Fields` - Meta fields and data handling
-- `RTM_Publications` - Google Scholar integration
-- `RTM_Admin` - Administrative interface
-- `RTM_Public` - Frontend display logic
+- `RTM_Teams` - Per-lab `research_team` term settings (PI, logo, intro, Scholar ID, contact)
+- `RTM_REST_API` - REST fields + Query Loop sorting for team members
 - `RTM_Blocks` - Gutenberg block functionality
+
+> Note: `RTM_Post_Types`, `RTM_Publications`, `RTM_Admin` and `RTM_Public` exist in `includes/`/`public/` but are legacy scaffolding and are **not loaded**. The live functionality is in the main `research-team-manager.php` plus `RTM_Custom_Fields`, `RTM_REST_API`, `RTM_Teams` and `RTM_Blocks`.
 
 ## 🐛 Troubleshooting
 
@@ -280,6 +323,17 @@ For support and questions:
 
 ## 📈 Changelog
 
+### Version 1.1.0
+- **Multiple-teams mode**: model each lab as a `research_team` term with its own page at `/research-team/{slug}/`
+- Per-lab settings (PI, logo, intro, Scholar ID, contact) via team term meta
+- Per-lab publications (a `team_id` column scopes the publications table and the Publications admin screen)
+- Single ⇄ multiple mode toggle under **Team Members → Team Settings**
+- New `[rtm_team_header]` shortcode + `team=` attribute on the team/publications shortcodes
+- "Team" field added to the Team Member Field block
+- Generic default member-status terms (Current / Alumni / Visiting)
+- **Hardening**: prefixed all post type / taxonomy keys (`rtm_team_member`, `rtm_research_team`, …) to avoid collisions; added `uninstall.php` (drops table + options); shipped & enqueued front-end CSS (`assets/css/rtm-public.css`); added `wp_unslash()` to save handlers and plugin constants (`RTM_VERSION`, `RTM_PLUGIN_URL`, …); removed unused legacy classes and debug logging
+- **`[rtm_teams]` directory**: card-based lab directory (per-theme inline SVG icon · title · PI · focus) with theme filter chips, live search, and a **light/dark** toggle (auto via `prefers-color-scheme`, manual override persisted in `localStorage`); CSS is fully tokenised and cache-busted by file mtime
+
 ### Version 1.0.0
 - Initial release
 - Team member management
@@ -293,8 +347,9 @@ For support and questions:
 **Research Team Manager** - Streamline your academic team management with powerful WordPress integration.
 2. Customize as needed while maintaining the basic structure
 3. Available templates:
-   - `single-team_member.php` - Individual member pages
-   - `archive-team_member.php` - Team member archive
+   - `single-rtm_team_member.php` - Individual member pages
+   - `archive-rtm_team_member.php` - Team member archive
+   - `taxonomy-rtm_research_team.php` - Single lab/team page
 
 ## CSS Customization
 

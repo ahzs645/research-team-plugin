@@ -14,7 +14,6 @@ class RTM_Blocks {
         add_action('init', array($this, 'register_blocks'), 20); // Later priority
         add_action('init', array($this, 'register_block_category'), 5); // Early priority for category
         add_action('enqueue_block_editor_assets', array($this, 'enqueue_block_editor_assets'));
-        error_log('RTM: Blocks class initialized');
     }
     
     /**
@@ -65,17 +64,10 @@ class RTM_Blocks {
         
         // Check if block.json exists
         if (file_exists($block_path . '/block.json')) {
-            $result = register_block_type($block_path, array(
+            register_block_type($block_path, array(
                 'render_callback' => array($this, 'render_team_member_field_block')
             ));
-            if ($result) {
-                error_log('RTM: Team Member Field block registered successfully');
-            } else {
-                error_log('RTM: Failed to register Team Member Field block');
-            }
         } else {
-            error_log('RTM: block.json not found at ' . $block_path);
-            
             // Fallback manual registration if block.json is missing
             register_block_type('rtm/team-member-field', array(
                 'title' => __('Team Member Field', 'research-team-manager'),

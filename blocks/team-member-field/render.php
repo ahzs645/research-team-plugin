@@ -19,17 +19,17 @@ $team_member_id = 0;
 if (isset($block->context['postId'])) {
     $current_post_id = $block->context['postId'];
     $current_post = get_post($current_post_id);
-    if ($current_post && $current_post->post_type === 'team_member') {
+    if ($current_post && $current_post->post_type === 'rtm_team_member') {
         $team_member_id = $current_post_id;
     }
 } else {
     // Check if we're viewing a team member page directly
-    if (is_singular('team_member')) {
+    if (is_singular('rtm_team_member')) {
         $team_member_id = get_queried_object_id();
     } else {
         // Fallback to global post
         global $post;
-        if ($post && $post->post_type === 'team_member') {
+        if ($post && $post->post_type === 'rtm_team_member') {
             $team_member_id = $post->ID;
         }
     }
@@ -42,19 +42,25 @@ $field_value = '';
 if ($team_member_id) {
     // Handle special fields like taxonomies
     if ($field_name === 'research_areas') {
-        $terms = get_the_terms($team_member_id, 'research_area');
+        $terms = get_the_terms($team_member_id, 'rtm_research_area');
         if ($terms && !is_wp_error($terms)) {
             $term_names = wp_list_pluck($terms, 'name');
             $field_value = implode(', ', $term_names);
         }
     } elseif ($field_name === 'team_roles') {
-        $terms = get_the_terms($team_member_id, 'team_role');
+        $terms = get_the_terms($team_member_id, 'rtm_team_role');
         if ($terms && !is_wp_error($terms)) {
             $term_names = wp_list_pluck($terms, 'name');
             $field_value = implode(', ', $term_names);
         }
     } elseif ($field_name === 'member_status') {
-        $terms = get_the_terms($team_member_id, 'member_status');
+        $terms = get_the_terms($team_member_id, 'rtm_member_status');
+        if ($terms && !is_wp_error($terms)) {
+            $term_names = wp_list_pluck($terms, 'name');
+            $field_value = implode(', ', $term_names);
+        }
+    } elseif ($field_name === 'research_team') {
+        $terms = get_the_terms($team_member_id, 'rtm_research_team');
         if ($terms && !is_wp_error($terms)) {
             $term_names = wp_list_pluck($terms, 'name');
             $field_value = implode(', ', $term_names);
@@ -87,7 +93,8 @@ $field_labels = [
     'rtm_researchgate_url' => __('ResearchGate', 'research-team-manager'),
     'member_status' => __('Member Status', 'research-team-manager'),
     'research_areas' => __('Research Areas', 'research-team-manager'),
-    'team_roles' => __('Team Role', 'research-team-manager')
+    'team_roles' => __('Team Role', 'research-team-manager'),
+    'research_team' => __('Team', 'research-team-manager')
 ];
 
 // Get the label

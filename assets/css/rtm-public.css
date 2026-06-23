@@ -1,0 +1,303 @@
+/**
+ * Research Team Manager — front-end styles.
+ *
+ * Inherits the active theme's design tokens (sparklab: navy / cream / spark-orange,
+ * Outfit typography, custom radii) via theme.json CSS variables, with safe
+ * fallbacks so the plugin still looks reasonable on other themes.
+ */
+
+:root {
+    /* Point at the sparklab theme's own variables so the plugin inherits the
+       theme's light/dark mode (html[data-theme="dark"]) automatically. Fallbacks
+       keep it sane on other themes. */
+    --rtm-accent: var(--spark-orange, #f85c14);
+    --rtm-accent-hover: var(--spark-glow, #ff7a3d);
+    --rtm-ink: var(--text-primary, #122738);
+    --rtm-ink-2: var(--text-secondary, #3a4f63);
+    --rtm-muted: var(--text-muted, #6b7f8e);
+    --rtm-surface: var(--bg-card, #ffffff);
+    --rtm-surface-2: var(--navy-pale, #e8eef4);
+    --rtm-border: var(--card-border, rgba(18, 39, 56, .10));
+    --rtm-shadow: var(--card-shadow-hover, rgba(18, 39, 56, .14));
+    --rtm-font: var(--wp--preset--font-family--outfit, 'Outfit', sans-serif);
+    --rtm-radius: var(--radius-md, 12px);
+    --rtm-radius-lg: var(--radius-lg, 20px);
+}
+
+/* ================================================================== */
+/* Labs directory ([rtm_teams])                                       */
+/* ================================================================== */
+.rtm-labs { color: var(--rtm-ink-2); }
+
+/* Toolbar */
+.rtm-labs__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 28px;
+}
+.rtm-labs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.rtm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    border-radius: 50px;
+    border: 1px solid var(--rtm-border);
+    background: var(--rtm-surface);
+    color: var(--rtm-ink);
+    font-family: var(--rtm-font);
+    font-size: .9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.rtm-chip:hover { border-color: var(--rtm-accent); }
+.rtm-chip.is-active {
+    background: var(--rtm-accent);
+    border-color: var(--rtm-accent);
+    color: var(--rtm-ink);
+}
+.rtm-chip__count {
+    font-size: .78rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 50px;
+    background: var(--rtm-surface-2);
+    color: var(--rtm-muted);
+}
+.rtm-chip.is-active .rtm-chip__count {
+    background: rgba(18, 39, 56, .14);
+    color: var(--rtm-ink);
+}
+.rtm-labs__tools { display: flex; align-items: center; gap: 10px; }
+.rtm-labs__search {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px;
+    height: 40px;
+    border-radius: 50px;
+    border: 1px solid var(--rtm-border);
+    background: var(--rtm-surface);
+    color: var(--rtm-muted);
+}
+.rtm-labs__search:focus-within { border-color: var(--rtm-accent); }
+.rtm-labs__search svg { width: 17px; height: 17px; }
+.rtm-labs__search input {
+    border: 0;
+    background: transparent;
+    outline: none;
+    color: var(--rtm-ink);
+    font-family: var(--rtm-font);
+    font-size: .92rem;
+    width: 200px;
+    max-width: 46vw;
+}
+
+/* Groups */
+.rtm-labs__group { margin: 0 0 40px; }
+.rtm-labs__group-title {
+    margin: 0 0 6px;
+    font-family: var(--rtm-font);
+    font-weight: 700;
+    color: var(--rtm-ink);
+}
+.rtm-labs__group-title::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin-top: 8px;
+    background: var(--rtm-accent);
+}
+.rtm-labs__group-desc { margin: 10px 0 18px; max-width: 70ch; color: var(--rtm-muted); }
+.rtm-labs__empty { text-align: center; color: var(--rtm-muted); padding: 24px 0; }
+
+/* Grid + cards */
+.rtm-labs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+}
+.rtm-lab-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px;
+    background: var(--rtm-surface);
+    border: 1px solid var(--rtm-border);
+    border-radius: var(--rtm-radius);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.rtm-lab-card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    border-radius: var(--rtm-radius) 0 0 var(--rtm-radius);
+    background: var(--rtm-accent);
+    opacity: 0;
+    transition: opacity .16s ease;
+}
+.rtm-lab-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 36px var(--rtm-shadow);
+    border-color: transparent;
+}
+.rtm-lab-card:hover::before { opacity: 1; }
+.rtm-lab-card__logo-wrap { display: block; margin-bottom: 4px; }
+.rtm-lab-card__logo { max-height: 48px; width: auto; }
+.rtm-lab-card__title {
+    margin: 0;
+    font-family: var(--rtm-font);
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--rtm-ink);
+}
+.rtm-lab-card__meta {
+    margin: 0;
+    font-family: var(--rtm-font);
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--rtm-accent);
+}
+.rtm-lab-card__desc { margin: 0; font-size: .92rem; line-height: 1.55; color: var(--rtm-muted); }
+.rtm-lab-card__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: auto;
+    padding-top: 8px;
+    font-family: var(--rtm-font);
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--rtm-accent);
+}
+.rtm-lab-card__cta svg { width: 16px; height: 16px; transition: transform .16s ease; }
+.rtm-lab-card:hover .rtm-lab-card__cta svg { transform: translateX(3px); }
+.rtm-lab-card__link { position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.rtm-lab-card__link:focus-visible { outline: 2px solid var(--rtm-accent); outline-offset: 2px; }
+
+/* ================================================================== */
+/* Lab / team landing (hero + sections)                               */
+/* ================================================================== */
+.rtm-team-header {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin: 0 0 8px;
+    color: var(--rtm-ink-2);
+}
+.rtm-team-logo img { max-width: 160px; height: auto; border-radius: var(--rtm-radius); }
+.rtm-team-header-body { flex: 1 1 300px; }
+.rtm-team-title { margin: 0 0 10px; font-family: var(--rtm-font); font-weight: 800; line-height: 1.1; color: var(--rtm-ink); }
+.rtm-team-pi { margin: 4px 0; font-family: var(--rtm-font); font-weight: 600; color: var(--rtm-accent); }
+.rtm-team-location { margin: 4px 0; color: var(--rtm-muted); }
+.rtm-team-intro { margin-top: 14px; max-width: 72ch; }
+.rtm-team-contact { margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap; }
+.rtm-team-contact a { color: var(--rtm-accent); font-weight: 600; }
+.rtm-section-title {
+    margin: 40px 0 18px;
+    font-family: var(--rtm-font);
+    color: var(--rtm-ink);
+}
+.rtm-section-title::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin-top: 10px;
+    background: var(--rtm-accent);
+}
+
+/* ================================================================== */
+/* Team member grid                                                   */
+/* ================================================================== */
+.rtm-team-members {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px;
+}
+.rtm-team-member {
+    border: 1px solid var(--rtm-border);
+    border-radius: var(--rtm-radius);
+    overflow: hidden;
+    background: var(--rtm-surface);
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+.rtm-team-member:hover { box-shadow: 0 14px 36px var(--rtm-shadow); transform: translateY(-2px); }
+.rtm-member-photo img, .rtm-member-image { width: 100%; height: 240px; object-fit: cover; display: block; }
+.rtm-member-content { padding: 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.rtm-member-name { margin: 0; font-family: var(--rtm-font); font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+.rtm-member-name a { text-decoration: none; color: var(--rtm-ink); }
+.rtm-member-position { color: var(--rtm-muted); font-weight: 600; }
+.rtm-member-excerpt { color: var(--rtm-ink-2); font-size: .95rem; }
+.rtm-member-link { margin-top: auto; align-self: flex-start; color: var(--rtm-accent); font-weight: 700; text-decoration: none; }
+.rtm-member-link:hover { text-decoration: underline; }
+.rtm-status-tag, .rtm-role-tag, .rtm-area-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 50px;
+    font-size: .8rem;
+    line-height: 1.6;
+    background: var(--rtm-surface-2);
+    color: var(--rtm-ink-2);
+    margin: 2px 4px 2px 0;
+}
+.rtm-status-tag { background: var(--rtm-accent); color: var(--rtm-ink); }
+
+/* ================================================================== */
+/* Publications (grouped by year)                                     */
+/* ================================================================== */
+.rtm-publications-list { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; color: var(--rtm-ink-2); }
+.rtm-publications-content { flex: 1 1 480px; }
+.rtm-publication-year { margin-bottom: 24px; }
+.rtm-year-heading { margin: 0 0 12px; font-family: var(--rtm-font); color: var(--rtm-ink); }
+.rtm-publication-item { padding: 12px 0 12px 16px; border-left: 3px solid var(--rtm-accent); margin-bottom: 12px; }
+.rtm-publication-title { font-weight: 600; color: var(--rtm-ink); }
+.rtm-publication-authors, .rtm-publication-journal { color: var(--rtm-muted); font-size: .92rem; }
+.rtm-publication-links { margin-top: 6px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.rtm-url-link, .rtm-year-navigation li a { color: var(--rtm-accent); }
+.rtm-citation-count { font-size: .85rem; color: var(--rtm-muted); }
+.rtm-year-navigation { flex: 0 0 160px; position: sticky; top: 24px; }
+.rtm-year-navigation ul { list-style: none; margin: 0; padding: 0; }
+.rtm-year-navigation li a { display: block; padding: 4px 0; text-decoration: none; }
+
+@media (max-width: 600px) {
+    .rtm-labs__tools { width: 100%; }
+    .rtm-labs__search { flex: 1; }
+    .rtm-labs__search input { width: 100%; max-width: none; }
+    .rtm-member-photo img, .rtm-member-image { height: 200px; }
+    .rtm-year-navigation { position: static; flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rtm-lab-card, .rtm-team-member, .rtm-lab-card__cta svg, .rtm-lab-card::before { transition: none; }
+}
+
+/* ================================================================== */
+/* Sticky footer on plugin term/archive/single pages (short content). */
+/* Scoped via the body classes WordPress adds, so other pages are      */
+/* unaffected. Makes <main> grow so the footer hugs the viewport floor. */
+/* ================================================================== */
+body.tax-rtm_research_team .wp-site-blocks,
+body.post-type-archive-rtm_team_member .wp-site-blocks,
+body.single-rtm_team_member .wp-site-blocks {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+body.tax-rtm_research_team .wp-site-blocks > main,
+body.post-type-archive-rtm_team_member .wp-site-blocks > main,
+body.single-rtm_team_member .wp-site-blocks > main {
+    flex: 1 0 auto;
+}

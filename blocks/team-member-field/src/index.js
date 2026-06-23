@@ -17,7 +17,8 @@ const TEAM_MEMBER_FIELDS = [
 	{ label: __('ResearchGate URL', 'research-team-manager'), value: 'rtm_researchgate_url' },
 	{ label: __('Member Status', 'research-team-manager'), value: 'member_status' },
 	{ label: __('Research Areas', 'research-team-manager'), value: 'research_areas' },
-	{ label: __('Team Role', 'research-team-manager'), value: 'team_roles' }
+	{ label: __('Team Role', 'research-team-manager'), value: 'team_roles' },
+	{ label: __('Team', 'research-team-manager'), value: 'research_team' }
 ];
 
 registerBlockType('rtm/team-member-field', {
