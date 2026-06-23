@@ -342,6 +342,13 @@ For support and questions:
 
 ## 📈 Changelog
 
+### Version 1.3.0
+- **Member profiles**: new `[rtm_member_profile]` shortcode powers a real `/team-member/{slug}/` page (photo, PI badge + position, linked team chips, bio, contact, academic links: Scholar/ResearchGate/LinkedIn/ORCID/GitHub) with empty parts hidden.
+- **Works on any theme**: when a block theme has no matching template, the plugin renders its own canvas (`templates/block-canvas.php`) using the theme's header/footer parts + global styles, so labs and profiles display even on a theme that knows nothing about the plugin. A real theme/Site-Editor template still wins (`rtm_theme_has_block_template()` check).
+- **Honest publications Sync**: "Sync" no longer inserts placeholder/sample papers. With no fetcher it shows a clear notice to use Import/manual; integrators supply real data via the new **`rtm_fetch_scholar_publications`** filter (upserted per team, dedup by Scholar ID + team).
+- Seeded PI member posts are tagged **Current Members** so grouped rosters read correctly out of the box.
+- Docs: [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) updated (profiles, canvas fallback, Sync behavior, hooks).
+
 ### Version 1.2.0
 - **Team classifiers**: per-team **Type** (Lab/Centre/Institute/…) and **Research Theme**; the `/labs` directory now groups by Theme and shows a Type badge.
 - **Structured lead**: PI is now real member post(s) chosen via a **search + click-to-add** picker (linked to their profiles), or an **Organization** name; auto-shows "Principal Investigator(s):" vs "Led by:".

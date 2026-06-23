@@ -345,6 +345,40 @@
 .rtm-status-tag { background: var(--rtm-accent); color: var(--rtm-ink); }
 
 /* ================================================================== */
+/* Single member profile ([rtm_member_profile])                       */
+/* ================================================================== */
+/* Plugin block-canvas wrapper (when the plugin renders the page itself). */
+.rtm-canvas-inner { max-width: 1100px; margin-inline: auto; }
+
+.rtm-profile { color: var(--rtm-ink-2); }
+.rtm-profile-head { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 8px; }
+.rtm-profile-photo { flex: 0 0 220px; max-width: 220px; }
+.rtm-profile-img { width: 100%; height: auto; border-radius: var(--rtm-radius); display: block; }
+.rtm-profile-id { flex: 1 1 300px; }
+.rtm-profile-name { margin: 0 0 8px; font-family: var(--rtm-font); font-weight: 800; line-height: 1.1; color: var(--rtm-ink); }
+.rtm-profile-role { margin: 0 0 10px; color: var(--rtm-muted); font-weight: 600; }
+.rtm-profile-teams { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.rtm-profile-team {
+    display: inline-block; padding: 3px 12px; border-radius: 50px;
+    background: var(--rtm-surface-2); color: var(--rtm-ink); font-family: var(--rtm-font);
+    font-size: .85rem; font-weight: 600; text-decoration: none; border: 1px solid var(--rtm-border);
+}
+.rtm-profile-team:hover { border-color: var(--rtm-accent); color: var(--rtm-accent); }
+.rtm-profile-bio { margin: 22px 0; max-width: 72ch; line-height: 1.7; }
+.rtm-profile-contact { margin: 22px 0; padding-top: 18px; border-top: 1px solid var(--rtm-border); }
+.rtm-profile-contact-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+.rtm-profile-contact-list a { color: var(--rtm-accent); }
+.rtm-profile-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+.rtm-profile-link {
+    display: inline-block; padding: 6px 14px; border-radius: 50px; border: 1px solid var(--rtm-border);
+    background: var(--rtm-surface); color: var(--rtm-accent); font-family: var(--rtm-font);
+    font-size: .9rem; font-weight: 600; text-decoration: none;
+}
+.rtm-profile-link:hover { border-color: var(--rtm-accent); }
+.rtm-profile-back { margin-top: 24px; }
+.rtm-profile-back a { color: var(--rtm-accent); font-family: var(--rtm-font); font-weight: 600; text-decoration: none; }
+
+/* ================================================================== */
 /* Publications (grouped by year)                                     */
 /* ================================================================== */
 .rtm-publications-list { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; color: var(--rtm-ink-2); }

@@ -1,6 +1,6 @@
 # Research Team Manager — Admin & Usage Guide
 
-This guide covers the plugin as of **v1.2.0**, including the multiple‑teams (one
+This guide covers the plugin as of **v1.3.0**, including the multiple‑teams (one
 page per lab) workflow.
 
 ---
@@ -82,6 +82,13 @@ Team members are `rtm_team_member` posts (**Research Labs → All Team Members**
   appear once a specific team is selected (each uses that team's Scholar ID). With
   "All teams" selected you get a hint to pick one.
 
+> **About "Sync".** Google Scholar has no public API and scraping is blocked, so
+> the plugin ships **no built-in fetcher** — clicking Sync will *not* invent
+> placeholder papers. To get real data, either use **Import from JSON File** /
+> add entries manually, or wire up a fetcher via the `rtm_fetch_scholar_publications`
+> filter (see §7). Whatever the filter returns is upserted for that team (dedup by
+> Scholar ID + team).
+
 In single mode both pages collapse to the classic global Scholar ID + one list.
 
 ---
@@ -97,6 +104,18 @@ link per card. Each card links to the lab's page.
 On a **block theme**, the lab archive is rendered by a block template
 (`taxonomy-rtm_research_team.html`, see §6) composed from three shortcodes; on a
 **classic theme** the bundled `templates/taxonomy-rtm_research_team.php` is used.
+**If the theme provides no template at all**, the plugin renders its own canvas
+(`templates/block-canvas.php`) — it pulls in the theme's header/footer parts and
+global styles and runs the shortcodes, so labs and member profiles work even on a
+theme that has never heard of the plugin. A real theme/Site-Editor template always
+wins over the canvas.
+
+### A member profile — `[rtm_member_profile]`
+Each member (`rtm_team_member`) has a single page at `/team-member/{slug}/`,
+rendered by `[rtm_member_profile]`: photo, name, PI badge + position, linked team
+chips, bio, contact (email / phone / website), academic links (Scholar,
+ResearchGate, LinkedIn, ORCID, GitHub), and a back-to-team link. Empty parts are
+hidden. On block themes it renders through the same canvas/template path as labs.
 
 ### Shortcodes
 
@@ -108,6 +127,7 @@ On a **block theme**, the lab archive is rendered by a block template
 | `[rtm_team_publications]` | "Publications" for the team; **hidden if empty**. | `team`, `heading` |
 | `[sorted_publications]` | Publications grouped by year. | `team` |
 | `[rtm_team_members]` | Simple member grid. | `team`, `role`, `research_area`, `limit` |
+| `[rtm_member_profile]` | Single member profile (photo, bio, teams, contact, links). | `id` (defaults to current post) |
 
 `team` accepts a slug or ID; omitted, it auto‑detects the current lab archive.
 
@@ -151,3 +171,12 @@ still pin the footer to the bottom.
 - Options: `rtm_team_mode`, `rtm_default_team`, `rtm_google_scholar_user_id`
   (all removed on uninstall, which also drops the publications table; member
   posts and terms are intentionally preserved).
+
+### Hooks
+
+- **Filter `rtm_fetch_scholar_publications`** — `apply_filters('rtm_fetch_scholar_publications', array(), $user_id, $team_id)`.
+  Return an array of rows (`title`, `authors`, `journal`, `year`, `citations`,
+  `url`, `google_scholar_id`, `abstract`) and "Sync" will upsert them for that
+  team (dedup by `google_scholar_id` + `team_id`; only `title` is required). This
+  is the supported way to plug in a real Scholar/SerpAPI fetcher without touching
+  core. Return empty (the default) and Sync shows the "use Import/manual" notice.

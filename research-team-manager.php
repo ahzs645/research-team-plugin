@@ -3,7 +3,7 @@
  * Plugin Name: Research Team Manager Simple
  * Plugin URI: https://example.com/research-team-manager
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.2.0');
+define('RTM_VERSION', '1.3.0');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -982,63 +982,72 @@ function rtm_scholar_settings_page_multi() {
     <?php
 }
 
-// Sync publications function
+/**
+ * Sync publications for a team from Google Scholar.
+ *
+ * There is no official Google Scholar API and scraping is unreliable/blocked, so
+ * the plugin does not ship a built-in fetcher. Instead it exposes a filter —
+ * `rtm_fetch_scholar_publications` — that an integration (e.g. a SerpAPI-backed
+ * add-on) can implement to return real records; whatever it returns is stored
+ * against the team. With no integration, we tell the user to use Import / manual
+ * entry rather than inserting placeholder rows.
+ */
 function rtm_sync_publications($team_id = 0) {
     $team_id = (int) $team_id;
     $user_id = rtm_get_scholar_id_for_team($team_id);
 
     if (empty($user_id)) {
-        echo '<div class="notice notice-error"><p>No Google Scholar ID is set'
-            . ($team_id ? ' for this team. Add one on the team\'s edit screen.' : '. Set one under Scholar Settings.')
+        echo '<div class="notice notice-error"><p>' . esc_html__('No Google Scholar ID is set', 'research-team-manager')
+            . esc_html($team_id ? __(' for this team — add one on Scholar Settings or the team’s edit screen.', 'research-team-manager') : __('. Set one under Scholar Settings.', 'research-team-manager'))
             . '</p></div>';
         return false;
     }
 
-    // For now, add sample data
-    // In production, this would scrape Google Scholar
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'rtm_publications';
+    /**
+     * Return an array of publication rows to import for this Scholar profile.
+     * Each row: title, authors, journal, year, citations, url, google_scholar_id, abstract.
+     *
+     * @param array  $publications Default empty.
+     * @param string $user_id      The team's Google Scholar user ID.
+     * @param int    $team_id      The team term ID (0 = global/single).
+     */
+    $publications = apply_filters('rtm_fetch_scholar_publications', array(), $user_id, $team_id);
 
-    // Sample publication data
-    $sample_publications = array(
-        array(
-            'title' => 'Sample Research Paper on Machine Learning',
-            'authors' => 'Smith J., Jones A., Williams B.',
-            'journal' => 'Journal of AI Research',
-            'year' => 2024,
-            'citations' => 45,
-            'url' => 'https://example.com/paper1',
-            'google_scholar_id' => 'sample_id_1',
-            'abstract' => 'This is a sample abstract for the research paper.'
-        ),
-        array(
-            'title' => 'Advanced Neural Network Architectures',
-            'authors' => 'Johnson M., Brown K., Davis L.',
-            'journal' => 'Neural Computing Conference',
-            'year' => 2023,
-            'citations' => 128,
-            'url' => 'https://example.com/paper2',
-            'google_scholar_id' => 'sample_id_2',
-            'abstract' => 'Exploring new architectures in neural networks.'
-        ),
-    );
-
-    foreach ($sample_publications as $pub) {
-        $pub['team_id'] = $team_id;
-
-        // Uniqueness is scoped per team so the same paper can exist for two labs.
-        $existing = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM $table_name WHERE google_scholar_id = %s AND team_id = %d",
-            $pub['google_scholar_id'],
-            $team_id
-        ));
-
-        if (!$existing) {
-            $wpdb->insert($table_name, $pub);
-        }
+    if (empty($publications) || !is_array($publications)) {
+        echo '<div class="notice notice-warning"><p>'
+            . esc_html__('Automated Google Scholar sync isn’t available (Scholar has no public API). Use “Import from JSON File” or add publications manually — they’ll be scoped to this team.', 'research-team-manager')
+            . '</p></div>';
+        return false;
     }
 
-    echo '<div class="notice notice-success"><p>Publications synced successfully!</p></div>';
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'rtm_publications';
+    $allowed    = array('title', 'authors', 'journal', 'year', 'citations', 'url', 'google_scholar_id', 'abstract');
+    $imported   = 0;
+
+    foreach ($publications as $pub) {
+        $row = array_intersect_key((array) $pub, array_flip($allowed));
+        if (empty($row['title'])) {
+            continue;
+        }
+        $row['team_id'] = $team_id;
+        $gsid = isset($row['google_scholar_id']) ? $row['google_scholar_id'] : '';
+
+        $existing = $gsid ? $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_name WHERE google_scholar_id = %s AND team_id = %d",
+            $gsid,
+            $team_id
+        )) : null;
+
+        if ($existing) {
+            $wpdb->update($table_name, $row, array('id' => $existing));
+        } else {
+            $wpdb->insert($table_name, $row);
+        }
+        $imported++;
+    }
+
+    echo '<div class="notice notice-success"><p>' . esc_html(sprintf(__('Synced %d publication(s).', 'research-team-manager'), $imported)) . '</p></div>';
 }
 
 // Import JSON publications function
@@ -1860,6 +1869,103 @@ function rtm_team_publications_shortcode($atts) {
 }
 
 /**
+ * [rtm_member_profile] — a full profile for a team member (photo, name, role,
+ * team(s), bio, contact and academic/social links). Empty parts are omitted.
+ * Defaults to the current post in the loop. Used by the single-member template.
+ */
+add_shortcode('rtm_member_profile', 'rtm_member_profile_shortcode');
+function rtm_member_profile_shortcode($atts) {
+    $atts = shortcode_atts(array('id' => 0), $atts);
+    $pid = $atts['id'] ? (int) $atts['id'] : get_the_ID();
+    if (!$pid || get_post_type($pid) !== 'rtm_team_member') {
+        return '';
+    }
+
+    $position = get_post_meta($pid, '_rtm_position', true);
+    $is_lead  = (bool) get_post_meta($pid, '_rtm_is_lead', true);
+    $bio      = get_post_meta($pid, '_rtm_long_description', true);
+    if (!$bio) {
+        $bio = get_post_meta($pid, '_rtm_short_description', true);
+    }
+    $email    = get_post_meta($pid, '_rtm_email', true);
+    $phone    = get_post_meta($pid, '_rtm_phonenumber', true);
+    $website  = get_post_meta($pid, '_rtm_website', true);
+
+    // Academic / social links (label => url), in display order.
+    $links = array(
+        'Google Scholar' => get_post_meta($pid, '_rtm_google_scholar_url', true),
+        'ResearchGate'   => get_post_meta($pid, '_rtm_researchgate_url', true),
+        'LinkedIn'       => get_post_meta($pid, '_rtm_linkedin_url', true),
+        'ORCID'          => get_post_meta($pid, '_rtm_orcid', true),
+        'GitHub'         => get_post_meta($pid, '_rtm_github', true),
+        'Website'        => $website,
+    );
+    $links = array_filter($links);
+
+    $teams = get_the_terms($pid, 'rtm_research_team');
+    $teams = ($teams && !is_wp_error($teams)) ? $teams : array();
+
+    ob_start();
+    ?>
+    <article class="rtm-profile">
+        <header class="rtm-profile-head">
+            <?php if (has_post_thumbnail($pid)): ?>
+                <div class="rtm-profile-photo"><?php echo get_the_post_thumbnail($pid, 'large', array('class' => 'rtm-profile-img')); ?></div>
+            <?php endif; ?>
+            <div class="rtm-profile-id">
+                <h1 class="rtm-profile-name"><?php echo esc_html(get_the_title($pid)); ?></h1>
+                <?php if ($is_lead): ?>
+                    <p class="rtm-profile-role"><span class="rtm-member-lead"><?php esc_html_e('Principal Investigator', 'research-team-manager'); ?></span></p>
+                <?php elseif ($position): ?>
+                    <p class="rtm-profile-role"><?php echo esc_html($position); ?></p>
+                <?php endif; ?>
+                <?php if ($teams): ?>
+                    <p class="rtm-profile-teams">
+                        <?php foreach ($teams as $t):
+                            $link = get_term_link($t); if (is_wp_error($link)) { continue; } ?>
+                            <a class="rtm-profile-team" href="<?php echo esc_url($link); ?>"><?php echo esc_html($t->name); ?></a>
+                        <?php endforeach; ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+        </header>
+
+        <?php if ($bio): ?>
+            <div class="rtm-profile-bio"><?php echo wp_kses_post(wpautop($bio)); ?></div>
+        <?php endif; ?>
+
+        <?php if ($email || $phone || $links): ?>
+            <div class="rtm-profile-contact">
+                <?php if ($email || $phone): ?>
+                    <ul class="rtm-profile-contact-list">
+                        <?php if ($email): ?><li><strong><?php esc_html_e('Email', 'research-team-manager'); ?>:</strong> <a href="mailto:<?php echo esc_attr($email); ?>"><?php echo esc_html($email); ?></a></li><?php endif; ?>
+                        <?php if ($phone): ?><li><strong><?php esc_html_e('Phone', 'research-team-manager'); ?>:</strong> <a href="tel:<?php echo esc_attr(preg_replace('/[^0-9+]/', '', $phone)); ?>"><?php echo esc_html($phone); ?></a></li><?php endif; ?>
+                    </ul>
+                <?php endif; ?>
+                <?php if ($links): ?>
+                    <p class="rtm-profile-links">
+                        <?php foreach ($links as $label => $url): ?>
+                            <a class="rtm-profile-link" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($label); ?></a>
+                        <?php endforeach; ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php
+        $archive = get_post_type_archive_link('rtm_team_member');
+        if ($teams):
+            $first = get_term_link($teams[0]);
+            if (!is_wp_error($first)): ?>
+                <p class="rtm-profile-back"><a href="<?php echo esc_url($first); ?>">&larr; <?php echo esc_html(sprintf(__('Back to %s', 'research-team-manager'), $teams[0]->name)); ?></a></p>
+            <?php endif;
+        endif; ?>
+    </article>
+    <?php
+    return ob_get_clean();
+}
+
+/**
  * Inline SVG icon for a theme (keyed by the theme term slug). Uses currentColor
  * so it adapts to light/dark. Falls back to a generic "atom" mark.
  */
@@ -2115,35 +2221,57 @@ function rtm_body_class($classes) {
 }
 
 /**
- * Use the plugin's bundled templates for team member archives/singulars and lab
- * pages — but only on classic themes, and only when the active theme hasn't
- * provided its own. Block themes render these through the Site Editor, so we
- * leave them alone (the bundled templates rely on get_header()/get_footer()).
+ * Does the active (block) theme — or a user customization — provide a block
+ * template for this slug? If so, we let it win (and stay editable in the Site
+ * Editor); otherwise the plugin renders the page itself.
+ */
+function rtm_theme_has_block_template($slug) {
+    if (!function_exists('get_block_template')) {
+        return false;
+    }
+    $tpl = get_block_template(get_stylesheet() . '//' . $slug, 'wp_template');
+    return $tpl instanceof WP_Block_Template;
+}
+
+/**
+ * Render lab pages and member profiles. The plugin is self-contained:
+ *  - Block themes: if the theme/Site Editor provides a matching block template
+ *    it wins; otherwise we render our own canvas (theme header/footer parts +
+ *    our shortcodes) so the page works without any theme files.
+ *  - Classic themes: a theme file override wins, else the bundled PHP template.
  */
 add_filter('template_include', 'rtm_template_include');
 function rtm_template_include($template) {
-    if (function_exists('wp_is_block_theme') && wp_is_block_theme()) {
-        return $template;
-    }
+    $is_block = function_exists('wp_is_block_theme') && wp_is_block_theme();
 
     if (is_tax('rtm_research_team')) {
-        $candidates  = array('taxonomy-rtm_research_team.php');
-        $plugin_file = 'templates/taxonomy-rtm_research_team.php';
-    } elseif (is_post_type_archive('rtm_team_member')) {
-        $candidates  = array('archive-rtm_team_member.php');
-        $plugin_file = 'templates/archive-rtm_team_member.php';
+        $slug    = 'taxonomy-rtm_research_team';
+        $classic = 'templates/taxonomy-rtm_research_team.php';
     } elseif (is_singular('rtm_team_member')) {
-        $candidates  = array('single-rtm_team_member.php');
-        $plugin_file = 'templates/single-rtm_team_member.php';
+        $slug    = 'single-rtm_team_member';
+        $classic = 'templates/single-rtm_team_member.php';
+    } elseif (is_post_type_archive('rtm_team_member')) {
+        if ($is_block) {
+            return $template; // leave the member archive to the block theme
+        }
+        $slug    = 'archive-rtm_team_member';
+        $classic = 'templates/archive-rtm_team_member.php';
     } else {
         return $template;
     }
 
-    if (locate_template($candidates)) {
-        return $template; // theme override wins
+    if ($is_block) {
+        if (rtm_theme_has_block_template($slug)) {
+            return $template; // theme / Site Editor template wins
+        }
+        $canvas = plugin_dir_path(__FILE__) . 'templates/block-canvas.php';
+        return file_exists($canvas) ? $canvas : $template;
     }
 
-    $plugin_template = plugin_dir_path(__FILE__) . $plugin_file;
+    if (locate_template(array($slug . '.php'))) {
+        return $template; // classic theme override wins
+    }
+    $plugin_template = plugin_dir_path(__FILE__) . $classic;
     return file_exists($plugin_template) ? $plugin_template : $template;
 }
 
