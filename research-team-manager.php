@@ -3,7 +3,7 @@
  * Plugin Name: Research Team Manager Simple
  * Plugin URI: https://example.com/research-team-manager
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.3.1
+ * Version: 1.3.2
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.3.1');
+define('RTM_VERSION', '1.3.2');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));

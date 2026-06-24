@@ -342,6 +342,9 @@ For support and questions:
 
 ## 📈 Changelog
 
+### Version 1.3.2
+- **Branding fix**: the roster “View profile” link and member position now use the brand font (`--rtm-font`, Outfit) instead of inheriting the theme's default content font.
+
 ### Version 1.3.1
 - **Per-member profile link**: each member can point their name/“View profile” link to *this site's profile page* (default), an *external page* (e.g. their UNBC people page — opens in a new tab with an ↗ icon), or *no link*. New **Profile link goes to** + **External profile URL** fields on the member editor.
 - **Card markup fix**: roster cards are now emitted as block-level wrappers so WordPress's `wpautop` (applied to shortcode-block output) can no longer inject stray `<p>`/`<br>` tags — fixes the mis-placed “View profile” link. Team/contact chips on the profile page are likewise newline-safe.
