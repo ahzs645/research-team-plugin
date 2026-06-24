@@ -342,6 +342,10 @@ For support and questions:
 
 ## 📈 Changelog
 
+### Version 1.3.1
+- **Per-member profile link**: each member can point their name/“View profile” link to *this site's profile page* (default), an *external page* (e.g. their UNBC people page — opens in a new tab with an ↗ icon), or *no link*. New **Profile link goes to** + **External profile URL** fields on the member editor.
+- **Card markup fix**: roster cards are now emitted as block-level wrappers so WordPress's `wpautop` (applied to shortcode-block output) can no longer inject stray `<p>`/`<br>` tags — fixes the mis-placed “View profile” link. Team/contact chips on the profile page are likewise newline-safe.
+
 ### Version 1.3.0
 - **Member profiles**: new `[rtm_member_profile]` shortcode powers a real `/team-member/{slug}/` page (photo, PI badge + position, linked team chips, bio, contact, academic links: Scholar/ResearchGate/LinkedIn/ORCID/GitHub) with empty parts hidden.
 - **Works on any theme**: when a block theme has no matching template, the plugin renders its own canvas (`templates/block-canvas.php`) using the theme's header/footer parts + global styles, so labs and profiles display even on a theme that knows nothing about the plugin. A real theme/Site-Editor template still wins (`rtm_theme_has_block_template()` check).

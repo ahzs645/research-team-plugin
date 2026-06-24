@@ -70,6 +70,16 @@ Team members are `rtm_team_member` posts (**Research Labs → All Team Members**
 - A member flagged as lead (`_rtm_is_lead`) shows a **Principal Investigator**
   badge and sorts first in the roster. A person can lead/belong to several labs
   (one member post, many teams).
+- **Profile link goes to** (`_rtm_profile_link`): where the member's name and
+  “View profile” link point on rosters —
+  - `page` (default) → this site's `/team-member/{slug}/` profile,
+  - `external` → the **External profile URL** (`_rtm_external_url`, e.g. a UNBC
+    people page); opens in a new tab with an ↗ icon, and the internal profile
+    page also gains a “View full profile ↗” button,
+  - `none` → the name is shown but not linked.
+
+  Use `external` for people who already have an authoritative institutional page
+  so you don't have to duplicate their photo/bio.
 
 ---
 

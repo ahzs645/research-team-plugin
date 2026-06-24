@@ -330,7 +330,10 @@
     font-size: .95rem;
 }
 .rtm-member-excerpt { color: var(--rtm-ink-2); font-size: .95rem; }
-.rtm-member-link { margin-top: auto; align-self: flex-start; color: var(--rtm-accent); font-weight: 700; text-decoration: none; }
+.rtm-member-role { margin: 0; }
+.rtm-member-cta { margin-top: auto; padding-top: 6px; }
+.rtm-member-link { display: inline-flex; align-items: center; gap: 5px; color: var(--rtm-accent); font-weight: 700; text-decoration: none; }
+.rtm-member-link svg { width: 14px; height: 14px; }
 .rtm-member-link:hover { text-decoration: underline; }
 .rtm-status-tag, .rtm-role-tag, .rtm-area-tag {
     display: inline-block;
@@ -364,6 +367,14 @@
     font-size: .85rem; font-weight: 600; text-decoration: none; border: 1px solid var(--rtm-border);
 }
 .rtm-profile-team:hover { border-color: var(--rtm-accent); color: var(--rtm-accent); }
+.rtm-profile-external { margin: 14px 0 0; }
+.rtm-profile-extlink {
+    display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 50px;
+    background: var(--rtm-accent); color: #fff; font-family: var(--rtm-font);
+    font-size: .9rem; font-weight: 700; text-decoration: none;
+}
+.rtm-profile-extlink:hover { filter: brightness(1.05); color: #fff; }
+.rtm-profile-extlink svg { width: 15px; height: 15px; }
 .rtm-profile-bio { margin: 22px 0; max-width: 72ch; line-height: 1.7; }
 .rtm-profile-contact { margin: 22px 0; padding-top: 18px; border-top: 1px solid var(--rtm-border); }
 .rtm-profile-contact-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 24px; }

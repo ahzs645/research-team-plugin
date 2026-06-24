@@ -3,7 +3,7 @@
  * Plugin Name: Research Team Manager Simple
  * Plugin URI: https://example.com/research-team-manager
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.3.0');
+define('RTM_VERSION', '1.3.1');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -1141,7 +1141,10 @@ function rtm_member_details_callback($post) {
     $phonenumber = get_post_meta($post->ID, '_rtm_phonenumber', true);
     $website = get_post_meta($post->ID, '_rtm_website', true);
     $position = get_post_meta($post->ID, '_rtm_position', true);
-    
+    $profile_link = get_post_meta($post->ID, '_rtm_profile_link', true);
+    if (!$profile_link) $profile_link = 'page';
+    $external_url = get_post_meta($post->ID, '_rtm_external_url', true);
+
     ?>
     <table class="form-table">
         <tr>
@@ -1223,6 +1226,24 @@ function rtm_member_details_callback($post) {
             <th><label for="rtm_position">Position</label></th>
             <td><input type="text" id="rtm_position" name="rtm_position" value="<?php echo esc_attr($position); ?>" class="regular-text" /></td>
         </tr>
+        <tr>
+            <th><label for="rtm_profile_link">Profile link goes to</label></th>
+            <td>
+                <select id="rtm_profile_link" name="rtm_profile_link">
+                    <option value="page" <?php selected($profile_link, 'page'); ?>>This site's profile page</option>
+                    <option value="external" <?php selected($profile_link, 'external'); ?>>An external page (e.g. UNBC people page)</option>
+                    <option value="none" <?php selected($profile_link, 'none'); ?>>Don't link (name only)</option>
+                </select>
+                <p class="description">Where the member's name and "View profile" link point on team rosters.</p>
+            </td>
+        </tr>
+        <tr id="rtm_external_url_row">
+            <th><label for="rtm_external_url">External profile URL</label></th>
+            <td>
+                <input type="url" id="rtm_external_url" name="rtm_external_url" value="<?php echo esc_attr($external_url); ?>" class="regular-text" placeholder="https://www.unbc.ca/people/zhou-dr-jianhui" />
+                <p class="description">Used when "Profile link goes to" is set to an external page. Opens in a new tab.</p>
+            </td>
+        </tr>
     </table>
     
     <script>
@@ -1302,6 +1323,13 @@ function rtm_member_details_callback($post) {
                 $('#rtm_long_description').val($(this).val());
             }
         });
+
+        // Only show the External URL field when "external" link is chosen.
+        function toggleExternalUrlRow() {
+            $('#rtm_external_url_row').toggle($('#rtm_profile_link').val() === 'external');
+        }
+        toggleExternalUrlRow();
+        $('#rtm_profile_link').on('change', toggleExternalUrlRow);
     });
     </script>
     <?php
@@ -1357,6 +1385,18 @@ function rtm_save_team_member_meta($post_id) {
             $value = call_user_func($sanitize, wp_unslash($_POST[$field]));
             update_post_meta($post_id, '_' . $field, $value);
         }
+    }
+
+    // Profile link target (whitelisted) + external URL.
+    if (isset($_POST['rtm_profile_link'])) {
+        $mode = sanitize_text_field(wp_unslash($_POST['rtm_profile_link']));
+        if (!in_array($mode, array('page', 'external', 'none'), true)) {
+            $mode = 'page';
+        }
+        update_post_meta($post_id, '_rtm_profile_link', $mode);
+    }
+    if (isset($_POST['rtm_external_url'])) {
+        update_post_meta($post_id, '_rtm_external_url', esc_url_raw(wp_unslash($_POST['rtm_external_url'])));
     }
 }
 
@@ -1808,6 +1848,32 @@ function rtm_team_roster_shortcode($atts) {
  * @param WP_Post[] $members
  * @return string
  */
+/**
+ * Resolve where a member's name/"View profile" link should point.
+ *
+ * Honours the per-member "_rtm_profile_link" setting: this site's profile page
+ * (default), an external URL (e.g. a UNBC people page), or no link at all.
+ *
+ * @return array|null ['url'=>string, 'external'=>bool] or null for "no link".
+ */
+function rtm_member_link($pid) {
+    $mode = get_post_meta($pid, '_rtm_profile_link', true);
+    if ($mode === '') {
+        $mode = 'page';
+    }
+    if ($mode === 'none') {
+        return null;
+    }
+    if ($mode === 'external') {
+        $ext = get_post_meta($pid, '_rtm_external_url', true);
+        if ($ext) {
+            return array('url' => $ext, 'external' => true);
+        }
+        // External chosen but no URL set → fall back to the internal page.
+    }
+    return array('url' => get_permalink($pid), 'external' => false);
+}
+
 function rtm_render_member_grid($members) {
     if (empty($members)) {
         return '';
@@ -1822,32 +1888,60 @@ function rtm_render_member_grid($members) {
         return strcasecmp(get_the_title($a->ID), get_the_title($b->ID));
     });
 
-    ob_start();
-    echo '<div class="rtm-team-members rtm-team-grid">';
+    // Built as one newline-free string per card so wpautop() (applied to
+    // shortcode-block output) can't inject stray <p>/<br> tags. Each child of
+    // .rtm-member-content is block-level for the same reason.
+    $out = '<div class="rtm-team-members rtm-team-grid">';
     foreach ($members as $m) {
         $pid      = $m->ID;
-        $url      = get_permalink($pid);
+        $title    = get_the_title($pid);
         $position = get_post_meta($pid, '_rtm_position', true);
         $is_lead  = (bool) get_post_meta($pid, '_rtm_is_lead', true);
-        ?>
-        <div class="rtm-team-member">
-            <?php if (has_post_thumbnail($pid)): ?>
-                <div class="rtm-member-photo"><a href="<?php echo esc_url($url); ?>"><?php echo get_the_post_thumbnail($pid, 'medium', array('class' => 'rtm-member-image')); ?></a></div>
-            <?php endif; ?>
-            <div class="rtm-member-content">
-                <h3 class="rtm-member-name"><a href="<?php echo esc_url($url); ?>"><?php echo esc_html(get_the_title($pid)); ?></a></h3>
-                <?php if ($is_lead): ?>
-                    <span class="rtm-member-lead"><?php esc_html_e('Principal Investigator', 'research-team-manager'); ?></span>
-                <?php elseif ($position): ?>
-                    <div class="rtm-member-position"><?php echo esc_html($position); ?></div>
-                <?php endif; ?>
-                <a class="rtm-member-link" href="<?php echo esc_url($url); ?>"><?php esc_html_e('View profile', 'research-team-manager'); ?></a>
-            </div>
-        </div>
-        <?php
+        $link     = rtm_member_link($pid);
+
+        $attr = '';
+        if ($link && $link['external']) {
+            $attr = ' target="_blank" rel="noopener noreferrer"';
+        }
+
+        $out .= '<div class="rtm-team-member">';
+
+        if (has_post_thumbnail($pid)) {
+            $img = get_the_post_thumbnail($pid, 'medium', array('class' => 'rtm-member-image'));
+            $out .= '<div class="rtm-member-photo">';
+            $out .= $link ? '<a href="' . esc_url($link['url']) . '"' . $attr . '>' . $img . '</a>' : $img;
+            $out .= '</div>';
+        }
+
+        $out .= '<div class="rtm-member-content">';
+
+        // Name
+        $name = esc_html($title);
+        $out .= '<h3 class="rtm-member-name">'
+            . ($link ? '<a href="' . esc_url($link['url']) . '"' . $attr . '>' . $name . '</a>' : $name)
+            . '</h3>';
+
+        // Role (lead badge or position) — block-level wrapper.
+        if ($is_lead) {
+            $out .= '<div class="rtm-member-role"><span class="rtm-member-lead">'
+                . esc_html__('Principal Investigator', 'research-team-manager') . '</span></div>';
+        } elseif ($position) {
+            $out .= '<div class="rtm-member-position">' . esc_html($position) . '</div>';
+        }
+
+        // CTA link — block-level wrapper; omitted when "no link".
+        if ($link) {
+            $label = $link['external']
+                ? esc_html__('View profile', 'research-team-manager') . ' ' . rtm_ui_icon('external')
+                : esc_html__('View profile', 'research-team-manager');
+            $out .= '<div class="rtm-member-cta"><a class="rtm-member-link" href="'
+                . esc_url($link['url']) . '"' . $attr . '>' . $label . '</a></div>';
+        }
+
+        $out .= '</div></div>';
     }
-    echo '</div>';
-    return ob_get_clean();
+    $out .= '</div>';
+    return $out;
 }
 
 /**
@@ -1919,13 +2013,18 @@ function rtm_member_profile_shortcode($atts) {
                 <?php elseif ($position): ?>
                     <p class="rtm-profile-role"><?php echo esc_html($position); ?></p>
                 <?php endif; ?>
-                <?php if ($teams): ?>
-                    <p class="rtm-profile-teams">
-                        <?php foreach ($teams as $t):
-                            $link = get_term_link($t); if (is_wp_error($link)) { continue; } ?>
-                            <a class="rtm-profile-team" href="<?php echo esc_url($link); ?>"><?php echo esc_html($t->name); ?></a>
-                        <?php endforeach; ?>
-                    </p>
+                <?php
+                $team_chips = '';
+                foreach ($teams as $t) {
+                    $tl = get_term_link($t);
+                    if (is_wp_error($tl)) { continue; }
+                    $team_chips .= '<a class="rtm-profile-team" href="' . esc_url($tl) . '">' . esc_html($t->name) . '</a>';
+                }
+                if ($team_chips !== ''): ?>
+                    <p class="rtm-profile-teams"><?php echo $team_chips; // phpcs:ignore WordPress.Security.EscapeOutput ?></p>
+                <?php endif; ?>
+                <?php $external_url = get_post_meta($pid, '_rtm_external_url', true); if ($external_url): ?>
+                    <p class="rtm-profile-external"><a class="rtm-profile-extlink" href="<?php echo esc_url($external_url); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('View full profile', 'research-team-manager'); ?> <?php echo rtm_ui_icon('external'); ?></a></p>
                 <?php endif; ?>
             </div>
         </header>
@@ -1942,12 +2041,13 @@ function rtm_member_profile_shortcode($atts) {
                         <?php if ($phone): ?><li><strong><?php esc_html_e('Phone', 'research-team-manager'); ?>:</strong> <a href="tel:<?php echo esc_attr(preg_replace('/[^0-9+]/', '', $phone)); ?>"><?php echo esc_html($phone); ?></a></li><?php endif; ?>
                     </ul>
                 <?php endif; ?>
-                <?php if ($links): ?>
-                    <p class="rtm-profile-links">
-                        <?php foreach ($links as $label => $url): ?>
-                            <a class="rtm-profile-link" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($label); ?></a>
-                        <?php endforeach; ?>
-                    </p>
+                <?php if ($links):
+                    $link_chips = '';
+                    foreach ($links as $label => $url) {
+                        $link_chips .= '<a class="rtm-profile-link" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+                    }
+                    ?>
+                    <p class="rtm-profile-links"><?php echo $link_chips; // phpcs:ignore WordPress.Security.EscapeOutput ?></p>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
