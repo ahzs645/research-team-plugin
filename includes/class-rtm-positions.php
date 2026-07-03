@@ -41,7 +41,9 @@ class RTM_Positions {
         add_filter('manage_edit-' . self::TAXONOMY . '_columns', array($this, 'add_order_column'));
         add_filter('manage_' . self::TAXONOMY . '_custom_column', array($this, 'render_order_column'), 10, 3);
         add_filter('manage_edit-' . self::TAXONOMY . '_sortable_columns', array($this, 'add_sortable_column'));
-        add_action('pre_get_terms', array($this, 'order_admin_term_list'));
+        add_filter('terms_clauses', array($this, 'order_terms_by_meta'), 10, 3);
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_reorder_ui'));
+        add_action('wp_ajax_rtm_reorder_positions', array($this, 'ajax_reorder'));
 
         // Keep each member's denormalised rank in sync.
         add_action('save_post_rtm_team_member', array($this, 'sync_member_rank'), 20, 1);
@@ -150,26 +152,76 @@ class RTM_Positions {
     }
 
     /**
-     * Default the Positions admin list to rank order (and honour clicking the
-     * "Order" column). Every term is guaranteed an order-meta row, so the
-     * meta_value_num sort never excludes one.
+     * Force the Positions admin list to display in rank order. Works at the SQL
+     * level (LEFT JOIN on the order meta + ORDER BY) so it beats the hierarchical
+     * list table's built-in name sort. Skipped when the user explicitly sorts by
+     * another column (Name/Slug/Count). LEFT JOIN keeps terms without a row.
      */
-    public function order_admin_term_list($query) {
-        if (!is_admin()) {
-            return;
+    public function order_terms_by_meta($clauses, $taxonomies, $args) {
+        if (!is_admin() || !in_array(self::TAXONOMY, (array) $taxonomies, true)) {
+            return $clauses;
         }
-        $taxes = (array) ($query->query_vars['taxonomy'] ?? array());
-        if (!in_array(self::TAXONOMY, $taxes, true)) {
-            return;
+        global $pagenow, $wpdb;
+        if ($pagenow !== 'edit-tags.php') {
+            return $clauses;
         }
         $requested = isset($_REQUEST['orderby']) ? sanitize_key($_REQUEST['orderby']) : '';
-        if ($requested === '' || $requested === self::ORDER_META) {
-            $query->query_vars['meta_key'] = self::ORDER_META;
-            $query->query_vars['orderby']  = 'meta_value_num';
-            if (empty($_REQUEST['order'])) {
-                $query->query_vars['order'] = 'ASC';
+        if ($requested !== '' && $requested !== self::ORDER_META) {
+            return $clauses;
+        }
+        $order = (isset($_REQUEST['order']) && strtolower($_REQUEST['order']) === 'desc') ? 'DESC' : 'ASC';
+        $clauses['join']   .= " LEFT JOIN {$wpdb->termmeta} AS rtmpo ON (t.term_id = rtmpo.term_id AND rtmpo.meta_key = '" . esc_sql(self::ORDER_META) . "')";
+        $clauses['orderby'] = 'ORDER BY CAST(rtmpo.meta_value AS UNSIGNED)';
+        $clauses['order']   = $order;
+        return $clauses;
+    }
+
+    /**
+     * Load jQuery-UI sortable + our drag-to-reorder script on the Positions screen.
+     */
+    public function enqueue_reorder_ui($hook) {
+        if ($hook !== 'edit-tags.php') {
+            return;
+        }
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if (!$screen || $screen->taxonomy !== self::TAXONOMY) {
+            return;
+        }
+        wp_enqueue_script(
+            'rtm-positions-reorder',
+            plugins_url('assets/js/positions-reorder.js', dirname(__DIR__) . '/research-team-manager.php'),
+            array('jquery', 'jquery-ui-sortable'),
+            '1.0.0',
+            true
+        );
+        wp_localize_script('rtm-positions-reorder', 'RTMPositions', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('rtm_reorder_positions'),
+        ));
+    }
+
+    /**
+     * Persist a drag-reordered list: each term's order becomes its 1-based row
+     * position, then every member's rank is recomputed.
+     */
+    public function ajax_reorder() {
+        check_ajax_referer('rtm_reorder_positions');
+        if (!current_user_can('manage_categories')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $ids = isset($_POST['order']) ? array_map('intval', (array) wp_unslash($_POST['order'])) : array();
+        if (empty($ids)) {
+            wp_send_json_error(array('message' => 'empty'));
+        }
+        $position = 1;
+        foreach ($ids as $term_id) {
+            if (get_term($term_id, self::TAXONOMY) instanceof WP_Term) {
+                update_term_meta($term_id, self::ORDER_META, $position);
+                $position++;
             }
         }
+        $this->resync_all_members();
+        wp_send_json_success(array('count' => count($ids)));
     }
 
     /* ------------------------------------------------------------------ */
