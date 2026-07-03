@@ -217,6 +217,10 @@ function rtm_activate_plugin() {
 // Plugin deactivation hook
 register_deactivation_hook(__FILE__, 'rtm_deactivate_plugin');
 function rtm_deactivate_plugin() {
+    // Stop the publications auto-sync cron event.
+    if (class_exists('RTM_Pub_Sources')) {
+        RTM_Pub_Sources::clear_schedule();
+    }
     flush_rewrite_rules();
 }
 
@@ -910,12 +914,15 @@ function rtm_scholar_settings_page() {
         update_option(RTM_Pub_Sources::OPT_SOURCE, $src);
         update_option('rtm_google_scholar_user_id', sanitize_text_field(wp_unslash($_POST['rtm_google_scholar_user_id'] ?? '')));
         update_option(RTM_Pub_Sources::OPT_ZOTERO, absint($_POST['rtm_zotero_group_id'] ?? 0));
+        RTM_Pub_Sources::reschedule(isset($_POST['rtm_publications_schedule']) ? sanitize_key(wp_unslash($_POST['rtm_publications_schedule'])) : 'off');
         echo '<div class="notice notice-success"><p>Settings saved!</p></div>';
     }
 
-    $source  = RTM_Pub_Sources::get_source(0);
-    $user_id = get_option('rtm_google_scholar_user_id', '');
-    $zotero  = (int) get_option(RTM_Pub_Sources::OPT_ZOTERO, 0);
+    $source   = RTM_Pub_Sources::get_source(0);
+    $user_id  = get_option('rtm_google_scholar_user_id', '');
+    $zotero   = (int) get_option(RTM_Pub_Sources::OPT_ZOTERO, 0);
+    $schedule = RTM_Pub_Sources::get_schedule();
+    $status   = RTM_Pub_Sources::status();
     ?>
     <div class="wrap">
         <h1><?php esc_html_e('Publications Settings', 'research-team-manager'); ?></h1>
@@ -954,9 +961,38 @@ function rtm_scholar_settings_page() {
                         <?php endif; ?>
                     </td>
                 </tr>
+                <tr class="rtm-src-field rtm-src-google_scholar rtm-src-zotero">
+                    <th scope="row"><label for="rtm_publications_schedule"><?php esc_html_e('Auto-sync', 'research-team-manager'); ?></label></th>
+                    <td>
+                        <select name="rtm_publications_schedule" id="rtm_publications_schedule">
+                            <?php foreach (RTM_Pub_Sources::schedules() as $key => $label): ?>
+                                <option value="<?php echo esc_attr($key); ?>" <?php selected($schedule, $key); ?>><?php echo esc_html($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Sync the selected source automatically via WP-Cron. Manual is never auto-synced.', 'research-team-manager'); ?></p>
+                    </td>
+                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
+        <?php if ($status['schedule'] !== 'off'): $fmt = get_option('date_format') . ' ' . get_option('time_format'); ?>
+            <h2><?php esc_html_e('Auto-sync status', 'research-team-manager'); ?></h2>
+            <p><?php printf(
+                esc_html__('Next run: %s', 'research-team-manager'),
+                '<strong>' . esc_html($status['next'] ? wp_date($fmt, $status['next']) : __('not scheduled', 'research-team-manager')) . '</strong>'
+            ); ?></p>
+            <?php if (!empty($status['last']['time'])):
+                $r0 = isset($status['last']['results'][0]) ? $status['last']['results'][0] : null; ?>
+                <p>
+                    <?php printf(esc_html__('Last run: %s', 'research-team-manager'), '<strong>' . esc_html(wp_date($fmt, (int) $status['last']['time'])) . '</strong>'); ?>
+                    <?php if (is_array($r0) && !isset($r0['error'])): ?>
+                        &mdash; <?php printf(esc_html__('%1$d added, %2$d updated, %3$d removed', 'research-team-manager'), (int) $r0['new'], (int) $r0['updated'], (int) $r0['pruned']); ?>
+                    <?php elseif (is_array($r0) && isset($r0['error'])): ?>
+                        &mdash; <span style="color:#b32d2e;"><?php echo esc_html($r0['error']); ?></span>
+                    <?php endif; ?>
+                </p>
+            <?php endif; ?>
+        <?php endif; ?>
         <script>
         (function(){
             var sel = document.getElementById('rtm_publications_source');
@@ -2475,6 +2511,9 @@ new RTM_Teams();
 // Position taxonomy ordering. Instantiated at load time so its register_taxonomy_args
 // and register_term_meta hooks are in place before `init` fires.
 new RTM_Positions();
+
+// Publications auto-sync (WP-Cron): wire the scheduled-event handler + self-healing scheduler.
+RTM_Pub_Sources::init();
 
 // Initialize blocks and custom fields
 add_action('init', 'rtm_init_blocks');
