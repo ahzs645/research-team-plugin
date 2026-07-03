@@ -2395,6 +2395,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-custom-fields.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-rest-api.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-teams.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-zotero.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-positions.php';
 
 // Per-lab team settings. Instantiated at load time (not on `init`) so its own
 // `init` hook for register_term_meta() is in place before `init` fires.
@@ -2402,6 +2403,10 @@ new RTM_Teams();
 
 // Zotero publications preview (read-only proof of concept; admin page only).
 new RTM_Zotero();
+
+// Position taxonomy ordering. Instantiated at load time so its register_taxonomy_args
+// and register_term_meta hooks are in place before `init` fires.
+new RTM_Positions();
 
 // Initialize blocks and custom fields
 add_action('init', 'rtm_init_blocks');

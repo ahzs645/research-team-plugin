@@ -338,7 +338,8 @@ class RTM_REST_API {
                                 'start_date': 'Date Joined',
                                 'end_date': 'Date Left', 
                                 'date_priority': 'Priority + Date Order',
-                                'custom_order': 'Custom Display Order'
+                                'custom_order': 'Custom Display Order',
+                                'position': 'Position (rank order)'
                             });
                         }
                     }
