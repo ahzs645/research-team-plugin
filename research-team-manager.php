@@ -240,15 +240,26 @@ function rtm_create_publications_table() {
         citations int(11) DEFAULT 0 NOT NULL,
         url varchar(500) DEFAULT '' NOT NULL,
         google_scholar_id varchar(100) DEFAULT '' NOT NULL,
+        source varchar(20) DEFAULT 'manual' NOT NULL,
+        source_id varchar(255) DEFAULT '' NOT NULL,
         abstract text NOT NULL,
         date_created datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
         date_updated datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
         PRIMARY KEY  (id),
-        KEY team_id (team_id)
+        KEY team_id (team_id),
+        KEY source_lookup (team_id, source)
     ) $charset_collate;";
-    
+
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+
+    // One-time backfill: tag existing rows with their origin so multi-source
+    // sync can coexist without touching them. Scholar rows are identified by an
+    // existing google_scholar_id; everything else is treated as manual.
+    if (!get_option('rtm_pub_sources_migrated')) {
+        $wpdb->query("UPDATE {$table_name} SET source = 'google_scholar', source_id = google_scholar_id WHERE google_scholar_id <> '' AND source = 'manual'");
+        update_option('rtm_pub_sources_migrated', 1);
+    }
 }
 
 // Create default member status terms
@@ -456,11 +467,11 @@ function rtm_add_admin_menus() {
         'rtm_publications_page'
     );
     
-    // Add Scholar Settings submenu
+    // Add Publications Settings submenu (source picker: Manual / Scholar / Zotero)
     add_submenu_page(
         'edit.php?post_type=rtm_team_member',
-        'Scholar Settings',
-        'Scholar Settings',
+        'Publications Settings',
+        'Publications Settings',
         'manage_options',
         'rtm-scholar-settings',
         'rtm_scholar_settings_page'
@@ -747,6 +758,11 @@ function rtm_publications_page() {
         rtm_sync_publications($selected_team);
     }
 
+    // Handle preview (dry-run) request — shares the sync nonce.
+    if (isset($_POST['preview_publications']) && wp_verify_nonce($_POST['rtm_sync_nonce'] ?? '', 'rtm_sync_publications')) {
+        rtm_preview_publications($selected_team);
+    }
+
     // Handle import request
     if (isset($_POST['import_json']) && wp_verify_nonce($_POST['rtm_import_nonce'], 'rtm_import_json')) {
         rtm_import_json_publications($selected_team);
@@ -770,6 +786,8 @@ function rtm_publications_page() {
     }
     $team_names    = $multiple ? wp_list_pluck($teams, 'name', 'term_id') : array();
     $scholar_in_use = rtm_get_scholar_id_for_team($selected_team);
+    $pub_source     = RTM_Pub_Sources::get_source($selected_team);
+    $pub_source_lbl = RTM_Pub_Sources::label($pub_source);
 
     ?>
     <div class="wrap">
@@ -793,13 +811,13 @@ function rtm_publications_page() {
         <?php endif; ?>
 
         <p class="description">
-            <?php
-            if ($selected_team) {
-                printf('Scholar ID for this team: %s', $scholar_in_use ? '<code>' . esc_html($scholar_in_use) . '</code>' : '<em>not set</em>');
-            } else {
-                printf('Global Scholar ID: %s', $scholar_in_use ? '<code>' . esc_html($scholar_in_use) . '</code>' : '<em>not set</em>');
-            }
-            ?>
+            <?php printf(
+                /* translators: %s: source label */
+                esc_html__('Source: %s', 'research-team-manager'),
+                '<strong>' . esc_html($pub_source_lbl) . '</strong>'
+            ); ?>
+            &nbsp;·&nbsp;
+            <a href="<?php echo esc_url(admin_url('edit.php?post_type=rtm_team_member&page=rtm-scholar-settings')); ?>"><?php esc_html_e('Change in Publications Settings', 'research-team-manager'); ?></a>
         </p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
@@ -817,11 +835,16 @@ function rtm_publications_page() {
             <?php if ($multiple && !$selected_team): ?>
                 <p class="description"><?php esc_html_e('Select a team above to sync or import its publications. (Syncing pulls from that team’s own Google Scholar profile.)', 'research-team-manager'); ?></p>
             <?php else: ?>
-                <form method="post" style="display: inline-block; margin-right: 10px;">
-                    <?php wp_nonce_field('rtm_sync_publications', 'rtm_sync_nonce'); ?>
-                    <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
-                    <input type="submit" name="sync_publications" class="button button-primary" value="<?php echo esc_attr($selected_team ? sprintf(__('Sync “%s” from Google Scholar', 'research-team-manager'), $team_names[$selected_team] ?? __('team', 'research-team-manager')) : __('Sync Publications from Google Scholar', 'research-team-manager')); ?>" />
-                </form>
+                <?php if ($pub_source === RTM_Pub_Sources::MANUAL): ?>
+                    <p class="description" style="display:inline-block;margin-right:10px;"><?php esc_html_e('Source is “Manual” — use Import JSON or add entries by hand. Choose Google Scholar or Zotero in Publications Settings to enable sync.', 'research-team-manager'); ?></p>
+                <?php else: ?>
+                    <form method="post" style="display: inline-block; margin-right: 10px;">
+                        <?php wp_nonce_field('rtm_sync_publications', 'rtm_sync_nonce'); ?>
+                        <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
+                        <input type="submit" name="preview_publications" class="button button-secondary" value="<?php echo esc_attr(sprintf(__('Preview from %s', 'research-team-manager'), $pub_source_lbl)); ?>" />
+                        <input type="submit" name="sync_publications" class="button button-primary" value="<?php echo esc_attr(sprintf(__('Sync from %s', 'research-team-manager'), $pub_source_lbl)); ?>" />
+                    </form>
+                <?php endif; ?>
 
                 <form method="post" style="display: inline-block;">
                     <?php wp_nonce_field('rtm_import_json', 'rtm_import_nonce'); ?>
@@ -880,30 +903,75 @@ function rtm_scholar_settings_page() {
 
     // Save settings (single-team mode)
     if (isset($_POST['submit']) && wp_verify_nonce($_POST['rtm_settings_nonce'], 'rtm_save_settings')) {
-        update_option('rtm_google_scholar_user_id', sanitize_text_field(wp_unslash($_POST['rtm_google_scholar_user_id'])));
+        $src = isset($_POST['rtm_publications_source']) ? sanitize_key(wp_unslash($_POST['rtm_publications_source'])) : RTM_Pub_Sources::MANUAL;
+        if (!array_key_exists($src, RTM_Pub_Sources::sources())) {
+            $src = RTM_Pub_Sources::MANUAL;
+        }
+        update_option(RTM_Pub_Sources::OPT_SOURCE, $src);
+        update_option('rtm_google_scholar_user_id', sanitize_text_field(wp_unslash($_POST['rtm_google_scholar_user_id'] ?? '')));
+        update_option(RTM_Pub_Sources::OPT_ZOTERO, absint($_POST['rtm_zotero_group_id'] ?? 0));
         echo '<div class="notice notice-success"><p>Settings saved!</p></div>';
     }
 
+    $source  = RTM_Pub_Sources::get_source(0);
     $user_id = get_option('rtm_google_scholar_user_id', '');
+    $zotero  = (int) get_option(RTM_Pub_Sources::OPT_ZOTERO, 0);
     ?>
     <div class="wrap">
-        <h1>Google Scholar Settings</h1>
+        <h1><?php esc_html_e('Publications Settings', 'research-team-manager'); ?></h1>
+        <p class="description"><?php esc_html_e('Choose where publications come from. Run Preview / Sync on the Publications page.', 'research-team-manager'); ?></p>
         <form method="post" action="">
             <?php wp_nonce_field('rtm_save_settings', 'rtm_settings_nonce'); ?>
             <table class="form-table">
                 <tr>
-                    <th scope="row"><label for="rtm_google_scholar_user_id">Google Scholar User ID</label></th>
+                    <th scope="row"><label for="rtm_publications_source"><?php esc_html_e('Publications source', 'research-team-manager'); ?></label></th>
+                    <td>
+                        <select name="rtm_publications_source" id="rtm_publications_source">
+                            <?php foreach (RTM_Pub_Sources::sources() as $key => $label): ?>
+                                <option value="<?php echo esc_attr($key); ?>" <?php selected($source, $key); ?>><?php echo esc_html($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Manual = enter/import by hand. Google Scholar / Zotero = sync from that source.', 'research-team-manager'); ?></p>
+                    </td>
+                </tr>
+                <tr class="rtm-src-field rtm-src-google_scholar">
+                    <th scope="row"><label for="rtm_google_scholar_user_id"><?php esc_html_e('Google Scholar User ID', 'research-team-manager'); ?></label></th>
                     <td>
                         <input type="text" id="rtm_google_scholar_user_id" name="rtm_google_scholar_user_id" value="<?php echo esc_attr($user_id); ?>" class="regular-text" />
-                        <p class="description">Enter the user ID from a Google Scholar profile URL (e.g., m0_aWlQAAAAJ)</p>
+                        <p class="description"><?php esc_html_e('From a Scholar profile URL, e.g. m0_aWlQAAAAJ', 'research-team-manager'); ?></p>
                         <?php if ($user_id): ?>
-                            <p><a href="https://scholar.google.com/citations?user=<?php echo esc_attr($user_id); ?>" target="_blank" class="button button-secondary">View Profile</a></p>
+                            <p><a href="https://scholar.google.com/citations?user=<?php echo esc_attr($user_id); ?>" target="_blank" class="button button-secondary"><?php esc_html_e('View Profile', 'research-team-manager'); ?></a></p>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr class="rtm-src-field rtm-src-zotero">
+                    <th scope="row"><label for="rtm_zotero_group_id"><?php esc_html_e('Zotero Group ID', 'research-team-manager'); ?></label></th>
+                    <td>
+                        <input type="number" id="rtm_zotero_group_id" name="rtm_zotero_group_id" value="<?php echo esc_attr($zotero ?: ''); ?>" class="regular-text" placeholder="<?php echo esc_attr(RTM_Zotero::DEFAULT_GROUP); ?>" />
+                        <p class="description"><?php esc_html_e('Numeric ID of a public Zotero group (readable by all). No API key needed.', 'research-team-manager'); ?></p>
+                        <?php if ($zotero): ?>
+                            <p><a href="https://www.zotero.org/groups/<?php echo esc_attr($zotero); ?>" target="_blank" class="button button-secondary"><?php esc_html_e('View Group', 'research-team-manager'); ?></a></p>
                         <?php endif; ?>
                     </td>
                 </tr>
             </table>
             <?php submit_button(); ?>
         </form>
+        <script>
+        (function(){
+            var sel = document.getElementById('rtm_publications_source');
+            if (!sel) { return; }
+            function toggle(){
+                var v = sel.value;
+                var fields = document.querySelectorAll('.rtm-src-field');
+                for (var i = 0; i < fields.length; i++) {
+                    fields[i].style.display = fields[i].classList.contains('rtm-src-' + v) ? '' : 'none';
+                }
+            }
+            sel.addEventListener('change', toggle);
+            toggle();
+        })();
+        </script>
     </div>
     <?php
 }
@@ -993,61 +1061,63 @@ function rtm_scholar_settings_page_multi() {
  * entry rather than inserting placeholder rows.
  */
 function rtm_sync_publications($team_id = 0) {
-    $team_id = (int) $team_id;
-    $user_id = rtm_get_scholar_id_for_team($team_id);
+    $result = RTM_Pub_Sources::sync((int) $team_id, false);
+    rtm_render_sync_notice($result, false);
+    return !is_wp_error($result);
+}
 
-    if (empty($user_id)) {
-        echo '<div class="notice notice-error"><p>' . esc_html__('No Google Scholar ID is set', 'research-team-manager')
-            . esc_html($team_id ? __(' for this team — add one on Scholar Settings or the team’s edit screen.', 'research-team-manager') : __('. Set one under Scholar Settings.', 'research-team-manager'))
-            . '</p></div>';
-        return false;
+// Read-only dry run of the selected source: shows what a sync would do, writes nothing.
+function rtm_preview_publications($team_id = 0) {
+    $result = RTM_Pub_Sources::sync((int) $team_id, true);
+    rtm_render_sync_notice($result, true);
+    return !is_wp_error($result);
+}
+
+// Render a sync/preview result (WP_Error or stats array) as an admin notice.
+function rtm_render_sync_notice($result, $preview = false) {
+    if (is_wp_error($result)) {
+        echo '<div class="notice notice-warning"><p>' . esc_html($result->get_error_message()) . '</p></div>';
+        return;
     }
-
-    /**
-     * Return an array of publication rows to import for this Scholar profile.
-     * Each row: title, authors, journal, year, citations, url, google_scholar_id, abstract.
-     *
-     * @param array  $publications Default empty.
-     * @param string $user_id      The team's Google Scholar user ID.
-     * @param int    $team_id      The team term ID (0 = global/single).
-     */
-    $publications = apply_filters('rtm_fetch_scholar_publications', array(), $user_id, $team_id);
-
-    if (empty($publications) || !is_array($publications)) {
-        echo '<div class="notice notice-warning"><p>'
-            . esc_html__('Automated Google Scholar sync isn’t available (Scholar has no public API). Use “Import from JSON File” or add publications manually — they’ll be scoped to this team.', 'research-team-manager')
-            . '</p></div>';
-        return false;
+    $src = RTM_Pub_Sources::label($result['source']);
+    if ($preview) {
+        echo '<div class="notice notice-info"><p><strong>' . esc_html__('Preview — nothing was written.', 'research-team-manager') . '</strong> '
+            . esc_html(sprintf(
+                /* translators: 1: source, 2: fetched, 3: new, 4: updated, 5: pruned */
+                __('%1$s: %2$d fetched — %3$d new, %4$d updated, %5$d would be removed.', 'research-team-manager'),
+                $src, (int) $result['fetched'], (int) $result['new'], (int) $result['updated'], (int) $result['pruned']
+            )) . '</p></div>';
+        rtm_render_preview_table($result['samples']);
+    } else {
+        echo '<div class="notice notice-success"><p>' . esc_html(sprintf(
+            /* translators: 1: source, 2: new, 3: updated, 4: pruned */
+            __('Synced from %1$s: %2$d added, %3$d updated, %4$d removed.', 'research-team-manager'),
+            $src, (int) $result['new'], (int) $result['updated'], (int) $result['pruned']
+        )) . '</p></div>';
     }
+}
 
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'rtm_publications';
-    $allowed    = array('title', 'authors', 'journal', 'year', 'citations', 'url', 'google_scholar_id', 'abstract');
-    $imported   = 0;
-
-    foreach ($publications as $pub) {
-        $row = array_intersect_key((array) $pub, array_flip($allowed));
-        if (empty($row['title'])) {
-            continue;
-        }
-        $row['team_id'] = $team_id;
-        $gsid = isset($row['google_scholar_id']) ? $row['google_scholar_id'] : '';
-
-        $existing = $gsid ? $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM $table_name WHERE google_scholar_id = %s AND team_id = %d",
-            $gsid,
-            $team_id
-        )) : null;
-
-        if ($existing) {
-            $wpdb->update($table_name, $row, array('id' => $existing));
-        } else {
-            $wpdb->insert($table_name, $row);
-        }
-        $imported++;
+function rtm_render_preview_table($samples) {
+    if (empty($samples)) {
+        return;
     }
-
-    echo '<div class="notice notice-success"><p>' . esc_html(sprintf(__('Synced %d publication(s).', 'research-team-manager'), $imported)) . '</p></div>';
+    echo '<table class="wp-list-table widefat fixed striped" style="max-width:1100px;"><thead><tr>'
+        . '<th>' . esc_html__('Status', 'research-team-manager') . '</th>'
+        . '<th>' . esc_html__('Year', 'research-team-manager') . '</th>'
+        . '<th>' . esc_html__('Title', 'research-team-manager') . '</th>'
+        . '<th>' . esc_html__('Authors', 'research-team-manager') . '</th>'
+        . '<th>' . esc_html__('Journal', 'research-team-manager') . '</th></tr></thead><tbody>';
+    foreach ($samples as $s) {
+        $badge = ($s['status'] === 'new')
+            ? '<span style="color:#1a7f37;font-weight:600;">' . esc_html__('new', 'research-team-manager') . '</span>'
+            : '<span style="color:#996800;">' . esc_html__('update', 'research-team-manager') . '</span>';
+        echo '<tr><td>' . $badge . '</td>'
+            . '<td>' . esc_html($s['year'] ? $s['year'] : '—') . '</td>'
+            . '<td>' . esc_html(mb_strimwidth($s['title'], 0, 90, '…')) . '</td>'
+            . '<td>' . esc_html(mb_strimwidth($s['authors'], 0, 45, '…')) . '</td>'
+            . '<td>' . esc_html(mb_strimwidth($s['journal'], 0, 40, '…')) . '</td></tr>';
+    }
+    echo '</tbody></table>';
 }
 
 // Import JSON publications function
@@ -2395,13 +2465,11 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-custom-fields.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-rest-api.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-teams.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-zotero.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-publications-sources.php';
 
 // Per-lab team settings. Instantiated at load time (not on `init`) so its own
 // `init` hook for register_term_meta() is in place before `init` fires.
 new RTM_Teams();
-
-// Zotero publications preview (read-only proof of concept; admin page only).
-new RTM_Zotero();
 
 // Initialize blocks and custom fields
 add_action('init', 'rtm_init_blocks');
