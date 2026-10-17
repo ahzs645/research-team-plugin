@@ -5,6 +5,7 @@ lint:
 test: lint
 	php tests/updater.php
 	php tests/network.php
+	php tests/team-access.php
 	python3 scripts/check-release.py
 build:
 	python3 scripts/build.py

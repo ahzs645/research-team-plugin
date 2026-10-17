@@ -7,7 +7,52 @@
     const { createHigherOrderComponent } = wp.compose;
     const { Fragment } = wp.element;
     const { InspectorControls } = wp.blockEditor;
-    const { PanelBody, SelectControl } = wp.components;
+    const { PanelBody, SelectControl, CheckboxControl } = wp.components;
+    const data = window.rtmBlockData || { multiple: false, teams: [] };
+    const TEAM_TAX = 'rtm_research_team';
+
+    // Core Query Loop stores term filters in query.taxQuery: {taxonomy: [ids]}
+    // before WordPress 7.0, {include: {taxonomy: [ids]}, exclude: {...}} since.
+    function getTeamIds(query) {
+        const tax = query.taxQuery || {};
+        const ids = tax.include ? tax.include[TEAM_TAX] : tax[TEAM_TAX];
+        return (ids || []).map(Number);
+    }
+    function withTeamIds(query, ids) {
+        const tax = Object.assign({}, query.taxQuery || {});
+        if (data.taxIncludeFormat || tax.include || tax.exclude) {
+            tax.include = Object.assign({}, tax.include || {});
+            if (ids.length) { tax.include[TEAM_TAX] = ids; } else { delete tax.include[TEAM_TAX]; }
+        } else if (ids.length) {
+            tax[TEAM_TAX] = ids;
+        } else {
+            delete tax[TEAM_TAX];
+        }
+        return Object.assign({}, query, { taxQuery: tax });
+    }
+
+    // "Teams / PIs" panel: no team ticked shows every team; tick one or more to filter.
+    function teamPanel(query, setAttributes) {
+        if (!data.multiple || !data.teams.length) {
+            return null;
+        }
+        const selected = getTeamIds(query);
+        return wp.element.createElement(PanelBody, {title: 'Teams / PIs', initialOpen: true},
+            wp.element.createElement('p', {className: 'components-base-control__help'},
+                selected.length ? 'Showing members of the ticked teams.' : 'Showing members of every team. Tick one or more teams to filter.'),
+            data.teams.map(function (team) {
+                return wp.element.createElement(CheckboxControl, {
+                    key: team.id,
+                    label: team.lead ? team.name + ' — ' + team.lead : team.name,
+                    checked: selected.indexOf(team.id) !== -1,
+                    onChange: function (on) {
+                        const ids = on ? selected.concat([team.id]) : selected.filter(function (id) { return id !== team.id; });
+                        setAttributes({query: withTeamIds(query, ids)});
+                    }
+                });
+            })
+        );
+    }
 
     // Add custom sort options to Query Loop blocks that show team members
     const withCustomQueryControls = createHigherOrderComponent((BlockEdit) => {
@@ -39,6 +84,7 @@
             return wp.element.createElement(Fragment, null,
                 wp.element.createElement(BlockEdit, props),
                 wp.element.createElement(InspectorControls, null,
+                    teamPanel(query, setAttributes),
                     wp.element.createElement(PanelBody, {title: 'Team Member Sorting', initialOpen: true},
                         wp.element.createElement(SelectControl, {
                             label: 'Sort By', value: query.orderBy || 'date', options: customOrderByOptions,
@@ -56,56 +102,6 @@
         'editor.BlockEdit',
         'rtm/team-member-query-controls',
         withCustomQueryControls
-    );
-
-    // Modify the query arguments before they're sent to the REST API
-    addFilter(
-        'blocks.core/query.query',
-        'rtm/modify-team-member-query',
-        function(query, block) {
-            // Only modify team_member queries
-            if (query.postType !== 'rtm_team_member') {
-                return query;
-            }
-
-            // Map our custom orderby values to the actual query parameters
-            switch(query.orderBy) {
-                case 'start_date':
-                case 'joined_date':
-                    return {
-                        ...query,
-                        orderBy: 'meta_value',
-                        metaKey: '_rtm_start_date',
-                        metaType: 'DATE'
-                    };
-                    
-                case 'left_date':
-                case 'end_date':
-                    return {
-                        ...query,
-                        orderBy: 'meta_value',
-                        metaKey: '_rtm_end_date',
-                        metaType: 'DATE'
-                    };
-                    
-                case 'date_priority':
-                    // This is handled by the PHP pre_get_posts filter
-                    return {
-                        ...query,
-                        orderBy: 'date_priority'
-                    };
-                    
-                case 'custom_order':
-                    return {
-                        ...query,
-                        orderBy: 'meta_value_num',
-                        metaKey: '_rtm_order'
-                    };
-                    
-                default:
-                    return query;
-            }
-        }
     );
 
 })(window.wp);

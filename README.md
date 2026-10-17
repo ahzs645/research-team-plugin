@@ -158,6 +158,30 @@ Enhanced sorting options for Query Loop blocks:
 - **Custom Order**: Manual ordering via Display Order field
 - **Date Priority**: Priority members first, then chronological
 
+### Team workspaces (a menu and permissions per PI)
+In multiple-teams mode, **Team Settings → Team workspaces** gives each team (PI) its own workspace.
+
+**Sidebar menus.** Tick *Show a sidebar menu for each team* and each team gets a top-level menu, named after its PI(s) or the team. Choose which teams get one; with none ticked, every team does. Each menu has:
+- **Overview:** member and publication counts, quick links and the team managers.
+- **Members:** the member list, filtered to the team.
+- **Add Member:** new members join the team.
+- **Publications:** sync or preview that team's publications.
+- **Team Settings:** PI, intro, logo, Scholar ID and links.
+
+**Team access** (choose one):
+- **Open:** anyone who can manage team members can open every team. This is the default, and it matches how LeagueFlow's sport menus work.
+- **Restricted:** administrators and editors manage every team. Everyone else only sees the teams assigned to them, and only through their team menus. They can't open another team's members or settings, and editing a shared member never removes it from teams they don't manage.
+
+**Setting up a PI**
+1. Go to **Users → Add New**. Choose the **Research Team Manager (PI)** role and tick their team under *Research teams*. You can also assign team managers later on the team's edit screen, or on the user's profile.
+2. That role can manage members (add, edit, publish, delete), upload media, edit their team's settings and sync their team's publications. It cannot write posts or pages, create or delete teams, or change plugin settings. Importing publications from the server-side JSON file stays administrator-only.
+
+Team members now use their own capabilities (`edit_rtm_members`, `edit_others_rtm_members`, …) instead of the post capabilities. When the plugin updates, every existing role automatically gets the member capabilities that match the post capabilities it already has, so nobody loses access. Administrators and editors also get `rtm_manage_all_teams`.
+
+**Blocks**
+- Query Loops that show team members get a **Teams / PIs** panel in the sidebar: leave every team unticked for all teams, or tick one or more. The Researcher Directory Query Loop gets it too.
+- The new **Team Section** block shows one team's header, member roster or publications. Pick the team (PI) in the sidebar, or leave it on *the team of the page it is on* for team page templates.
+
 ### Researcher directory
 Formerly the separate *University Research Network* add-on. Turn it on under **Team Settings → Researcher directory**. It switches on by itself on sites that already have data from the add-on. It adds:
 

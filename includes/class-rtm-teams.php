@@ -518,7 +518,8 @@ class RTM_Teams {
      * Persist the term meta on create/edit.
      */
     public function save_term_meta($term_id) {
-        if (!current_user_can('manage_categories')) {
+        // Team managers may edit their own team (see RTM_Team_Access::map_meta_cap).
+        if (!current_user_can('edit_term', $term_id)) {
             return;
         }
 

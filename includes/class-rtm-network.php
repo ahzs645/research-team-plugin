@@ -480,7 +480,7 @@ class RTM_Network {
 
     public static function render_field($attrs, $content, $block) {
         $id = (int) ($block->context['postId'] ?? 0);
-        if (!$id && !empty($attrs['previewPostId']) && defined('REST_REQUEST') && REST_REQUEST && current_user_can('edit_posts')) {
+        if (!$id && !empty($attrs['previewPostId']) && defined('REST_REQUEST') && REST_REQUEST && current_user_can('edit_post', (int) $attrs['previewPostId'])) {
             $id = (int) $attrs['previewPostId'];
         }
         if (!$id) {
