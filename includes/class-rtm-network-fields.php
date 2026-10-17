@@ -276,6 +276,11 @@ class RTM_Network_Fields {
             'ignore'        => sanitize_textarea_field($s['ignore'] ?? ''),
         ));
 
+        // Removed fields stop matching searches; new text fields start to.
+        if (class_exists('RTM_Network') && RTM_Network::is_enabled()) {
+            RTM_Network::reindex_all();
+        }
+
         $notice = '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Directory fields saved. New fields appear on member screens and in the Researcher Field and Researcher Filters blocks.', 'research-team-manager') . '</p></div>';
         foreach ($errors as $error) {
             $notice .= '<div class="notice notice-warning"><p>' . esc_html($error) . '</p></div>';

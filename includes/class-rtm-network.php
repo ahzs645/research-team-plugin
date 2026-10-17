@@ -39,11 +39,14 @@ class RTM_Network {
 
     public static function maybe_start() {
         if (self::legacy_addon_active()) {
-            // Both would register the same blocks and taxonomies; let the
-            // add-on keep running until an administrator deactivates it.
+            // Both would register the same blocks and taxonomies, so the
+            // add-on keeps running until an administrator's next admin page
+            // view, which deactivates it (see take_over_from_addon()).
+            add_action('admin_init', array(__CLASS__, 'take_over_from_addon'));
             add_action('admin_notices', array(__CLASS__, 'legacy_addon_notice'));
             return;
         }
+        add_action('admin_notices', array(__CLASS__, 'took_over_notice'));
         if (!self::is_enabled()) {
             return;
         }
@@ -77,10 +80,60 @@ class RTM_Network {
         return defined('RTMN_VERSION') || function_exists('rtmn_taxonomies');
     }
 
+    /**
+     * Migrate from the add-on automatically: the data, blocks and pages
+     * already match, so deactivating the add-on is all that is needed. Runs
+     * for an administrator's ordinary admin page view, then reloads the page
+     * without the add-on. Sites can opt out with the
+     * `rtm_network_auto_migrate` filter and deactivate it themselves.
+     */
+    public static function take_over_from_addon() {
+        if (!current_user_can('activate_plugins') || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) ||
+            ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' || !apply_filters('rtm_network_auto_migrate', true)) {
+            return;
+        }
+        $plugin = self::legacy_addon_basename();
+        if (!$plugin || !function_exists('deactivate_plugins') || (is_multisite() && is_plugin_active_for_network($plugin))) {
+            return; // network-activated: leave it to a network administrator
+        }
+        deactivate_plugins($plugin);
+        update_option('rtm_network_took_over', $plugin, false);
+        wp_safe_redirect(add_query_arg(array()));
+        exit;
+    }
+
+    /** Plugin basename of the running add-on, whatever its folder is called. */
+    private static function legacy_addon_basename() {
+        if (!function_exists('rtmn_taxonomies')) {
+            return '';
+        }
+        $file = (new ReflectionFunction('rtmn_taxonomies'))->getFileName();
+        $file = $file ? plugin_basename($file) : '';
+        return $file !== '' && strpos($file, '/') !== false ? $file : '';
+    }
+
+    /** One-time confirmation after the automatic migration. */
+    public static function took_over_notice() {
+        $plugin = get_option('rtm_network_took_over');
+        if (!$plugin || !current_user_can('activate_plugins')) {
+            return;
+        }
+        delete_option('rtm_network_took_over');
+        printf(
+            '<div class="notice notice-success is-dismissible"><p>%s</p></div>',
+            sprintf(
+                /* translators: %s: Directory Fields URL */
+                wp_kses_post(__('Research Team Manager now runs your researcher directory, so the University Research Network add-on was deactivated. Your researchers, fields, filters and pages are unchanged, and you can delete the add-on from the Plugins screen. Review the fields under <a href="%s">Directory Fields</a>.', 'research-team-manager')),
+                esc_url(RTM_Network_Fields::page_url())
+            )
+        );
+    }
+
     public static function legacy_addon_notice() {
         if (!current_user_can('activate_plugins')) {
             return;
         }
+        // Shown only when the automatic migration did not run (opted out or network-activated).
         echo '<div class="notice notice-warning"><p>' . esc_html__('Research Team Manager now includes the researcher directory from the University Research Network add-on. Deactivate the add-on to use the built-in version; your researchers, filters and pages are kept.', 'research-team-manager') . '</p></div>';
     }
 
@@ -97,10 +150,19 @@ class RTM_Network {
         return $value === '1';
     }
 
+    /** Whether the site holds data from the add-on: member meta or directory terms. */
     private static function has_existing_data() {
         global $wpdb;
-        $found = $wpdb->get_var("SELECT 1 FROM {$wpdb->postmeta} WHERE meta_key IN ('_rtmn_search', '_rtmn_affiliations', '_rtmn_unbc_record') LIMIT 1");
+        $found = $wpdb->get_var("SELECT 1 FROM {$wpdb->postmeta} WHERE meta_key IN ('_rtmn_search', '_rtmn_affiliations', '_rtmn_unbc_record') LIMIT 1")
+            || $wpdb->get_var("SELECT 1 FROM {$wpdb->term_taxonomy} WHERE taxonomy IN ('rtmn_faculty', 'rtmn_department', 'rtmn_appointment', 'rtmn_supervision', 'rtmn_theme', 'rtmn_membership', 'rtmn_institution') LIMIT 1");
         return (bool) $found;
+    }
+
+    /** Rebuild every member's search index (after directory fields change). */
+    public static function reindex_all() {
+        foreach (get_posts(array('post_type' => 'rtm_team_member', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids')) as $id) {
+            self::index($id);
+        }
     }
 
     /** Taxonomy => singular label for every configured list field. */

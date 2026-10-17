@@ -197,7 +197,7 @@ Formerly the separate *University Research Network* add-on. Turn it on under **T
 - Blocks: **Researcher Field** (any built-in or configured field), **Researcher Filters** (keyword search plus the fields marked as filters) and **Directory Tabs** (Researchers / Labs & institutes).
 - A **Researcher Directory** Query Loop variation and the *University Researcher Directory* and *Researcher Profile* patterns.
 
-The directory page is `/researchers/` by default; change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Developers can adjust fields with the `rtm_network_fields` filter. Block, taxonomy and meta names match the add-on, so deactivate the add-on and existing pages keep working.
+The directory page is `/researchers/` by default; change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Developers can adjust fields with the `rtm_network_fields` filter. Block, taxonomy and meta names match the add-on, so migration is automatic. When an administrator next opens any admin page, the add-on is deactivated, the directory switches on, and the add-on's fields and wording are kept. Opt out with the `rtm_network_auto_migrate` filter.
 
 ## 📝 Shortcodes
 

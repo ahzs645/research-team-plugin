@@ -24,6 +24,7 @@ $rtm_options = array(
     'rtm_network_enabled',
     'rtm_network_fields',
     'rtm_network_sources',
+    'rtm_network_took_over',
     'rtm_team_menus',
     'rtm_team_menu_label',
     'rtm_team_menu_teams',
