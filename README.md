@@ -82,17 +82,27 @@ After switching modes the plugin re-flushes permalinks automatically.
 
 ## Configuration
 
-- WordPress 5.0 or higher
+- WordPress 6.5 or higher
 - PHP 7.4 or higher
 - MySQL 5.6 or higher
 
 ## 📦 Installation
 
 ### Standard Installation
-1. Download the plugin files
-2. Upload to your `/wp-content/plugins/research-team-manager/` directory
-3. Activate the plugin through the WordPress admin
+1. Download `research-team-manager-X.Y.Z.zip` from the [latest release](https://github.com/ahzs645/research-team-plugin/releases/latest)
+2. In WordPress, go to **Plugins → Add New → Upload Plugin** and upload the ZIP
+3. Activate the plugin
 4. Configure settings under **Team Members > Settings**
+
+### Updates
+From 1.4.0, WordPress offers new versions from this repository's GitHub releases, just like updates from WordPress.org (**Dashboard → Updates** or the Plugins screen). The plugin's `Update URI` header routes the check to `releases/latest/download/update.json`. A download is installed only when its SHA-256 matches the `update.json` attached to that same release. Automatic background updates are off.
+
+Sites running 1.3.2 or earlier have no updater. Upload the 1.4.0 ZIP once (**Upload Plugin → Replace current with uploaded**).
+
+### Releasing
+1. Bump `Version:` and `RTM_VERSION` in `research-team-manager.php` and add `releases/X.Y.Z.md`.
+2. Run `make test build` locally.
+3. Merge to `main`, then push a tag `vX.Y.Z`. The *Plugin checks and release* workflow builds the ZIP, `.sha256` and `update.json`, and publishes the GitHub release. A tag with a suffix (`vX.Y.Z-rc.1`) creates a prerelease without `update.json`, so sites are not offered it.
 
 ### Manual Installation
 1. Upload the plugin folder to `/wp-content/plugins/`
@@ -147,6 +157,47 @@ Enhanced sorting options for Query Loop blocks:
 - **End Date**: Sort by leave dates (useful for alumni)
 - **Custom Order**: Manual ordering via Display Order field
 - **Date Priority**: Priority members first, then chronological
+
+### Team workspaces (a menu and permissions per PI)
+In multiple-teams mode, **Team Settings → Team workspaces** gives each team (PI) its own workspace.
+
+**Sidebar menus.** Tick *Show a sidebar menu for each team* and each team gets a top-level menu, named after its PI(s) or the team. Choose which teams get one; with none ticked, every team does. Each menu has:
+- **Overview:** member and publication counts, quick links and the team managers.
+- **Members:** the member list, filtered to the team.
+- **Add Member:** new members join the team.
+- **Publications:** sync or preview that team's publications.
+- **Team Settings:** PI, intro, logo, Scholar ID and links.
+
+**Team access** (choose one):
+- **Open:** anyone who can manage team members can open every team. This is the default, and it matches how LeagueFlow's sport menus work.
+- **Restricted:** administrators and editors manage every team. Everyone else only sees the teams assigned to them, and only through their team menus. They can't open another team's members or settings, and editing a shared member never removes it from teams they don't manage.
+
+**Setting up a PI**
+1. Go to **Users → Add New**. Choose the **Research Team Manager (PI)** role and tick their team under *Research teams*. You can also assign team managers later on the team's edit screen, or on the user's profile.
+2. That role can manage members (add, edit, publish, delete), upload media, edit their team's settings and sync their team's publications. It cannot write posts or pages, create or delete teams, or change plugin settings. Importing publications from the server-side JSON file stays administrator-only.
+
+Team members now use their own capabilities (`edit_rtm_members`, `edit_others_rtm_members`, …) instead of the post capabilities. When the plugin updates, every existing role automatically gets the member capabilities that match the post capabilities it already has, so nobody loses access. Administrators and editors also get `rtm_manage_all_teams`.
+
+**Blocks**
+- Query Loops that show team members get a **Teams / PIs** panel in the sidebar: leave every team unticked for all teams, or tick one or more. The Researcher Directory Query Loop gets it too.
+- The new **Team Section** block shows one team's header, member roster or publications. Pick the team (PI) in the sidebar, or leave it on *the team of the page it is on* for team page templates.
+
+### Researcher directory
+Formerly the separate *University Research Network* add-on. Turn it on under **Team Settings → Researcher directory**. It switches on by itself on sites that already have data from the add-on. It adds:
+
+- **Your own directory fields** under **Research Labs → Directory Fields**: add, rename, reorder and remove the details you record for each researcher.
+  - A *List of choices* field (for example Faculty, Department or Campus) stores values you pick from. It can be a filter on the public directory and a column in the member list.
+  - A *Text* field holds a short value (for example Office).
+  - Research topic (the Research Areas taxonomy) is built in.
+  - New sites start with Faculty, Department, Research topic, Research theme and Institution. Sites upgrading from the add-on keep its fields.
+  - Removing a field only hides it; the values return if you add the same key again.
+- An *Imported records* section on the same screen for members imported from an external directory: the source names shown on profiles, a default institution, a trusted portrait address, institution aliases and values that are not institutions.
+- A *Directory details* meta box with institutional affiliations (they fill the Institution field) and the text fields.
+- A keyword search index (`_rtmn_search`) over names, positions, biographies, affiliations and every directory field.
+- Blocks: **Researcher Field** (any built-in or configured field), **Researcher Filters** (keyword search plus the fields marked as filters) and **Directory Tabs** (Researchers / Labs & institutes).
+- A **Researcher Directory** Query Loop variation and the *University Researcher Directory* and *Researcher Profile* patterns.
+
+The directory page is `/researchers/` by default; change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Developers can adjust fields with the `rtm_network_fields` filter. Block, taxonomy and meta names match the add-on, so migration is automatic. When an administrator next opens any admin page, the add-on is deactivated, the directory switches on, and the add-on's fields and wording are kept. Opt out with the `rtm_network_auto_migrate` filter.
 
 ## 📝 Shortcodes
 

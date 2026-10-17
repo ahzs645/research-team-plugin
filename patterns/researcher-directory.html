@@ -1,0 +1,33 @@
+<!-- wp:paragraph {"className":"rtmn-intro"} --><p class="rtmn-intro">Explore researchers, labs and institutes across the university research network. Find expertise and connect with people whose interests match yours.</p><!-- /wp:paragraph --><!-- wp:rtmn/directory-tabs /--><!-- wp:group {"className":"rtmn-view-researchers","layout":{"type":"default"}} --><div class="wp-block-group rtmn-view-researchers">
+
+<!-- wp:rtmn/filters /-->
+<!-- wp:query {"queryId":82,"namespace":"rtmn/researchers","query":{"perPage":12,"pages":0,"offset":0,"postType":"rtm_team_member","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"","inherit":false,"rtmnDirectory":true},"className":"rtmn-directory"} -->
+<div class="wp-block-query rtmn-directory">
+<!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} -->
+<!-- wp:group {"className":"rtmn-card","layout":{"type":"default"}} -->
+<div class="wp-block-group rtmn-card">
+<!-- wp:rtmn/field {"field":"portrait"} /-->
+<!-- wp:post-title {"level":2,"isLink":true} /-->
+<!-- wp:rtmn/field {"field":"position"} /-->
+<!-- wp:rtmn/field {"field":"institution"} /-->
+<!-- wp:read-more {"content":"View researcher →"} /-->
+</div><!-- /wp:group -->
+<!-- /wp:post-template -->
+<!-- wp:query-pagination {"paginationArrow":"arrow","layout":{"type":"flex","justifyContent":"center"}} -->
+<!-- wp:query-pagination-previous {"label":"Previous"} /-->
+<!-- wp:query-pagination-numbers {"midSize":1} /-->
+<!-- wp:query-pagination-next {"label":"Next"} /-->
+<!-- /wp:query-pagination -->
+<!-- wp:query-no-results -->
+<!-- wp:paragraph --><p>No researchers match these filters. Try another topic or clear your filters.</p><!-- /wp:paragraph -->
+<!-- /wp:query-no-results -->
+</div><!-- /wp:query -->
+<!-- wp:heading {"level":2} --><h2 class="wp-block-heading">Start a conversation</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>Students can explore subject expertise and ask about supervision. Industry and community partners can find people to discuss potential collaborations. Contact each researcher to confirm their current role and availability.</p><!-- /wp:paragraph -->
+</div><!-- /wp:group --><!-- wp:group {"className":"rtmn-view-labs","layout":{"type":"default"}} --><div class="wp-block-group rtmn-view-labs">
+
+
+
+<!-- wp:shortcode -->
+[rtm_teams]
+<!-- /wp:shortcode --></div><!-- /wp:group -->

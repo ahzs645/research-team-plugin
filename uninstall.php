@@ -21,10 +21,28 @@ $rtm_options = array(
     'rtm_team_mode',
     'rtm_default_team',
     'rtm_google_scholar_user_id',
+    'rtm_network_enabled',
+    'rtm_network_fields',
+    'rtm_network_sources',
+    'rtm_network_took_over',
+    'rtm_team_menus',
+    'rtm_team_menu_label',
+    'rtm_team_menu_teams',
+    'rtm_team_access',
 );
 foreach ($rtm_options as $rtm_option) {
     delete_option($rtm_option);
 }
+
+// Remove the team manager (PI) role and member capabilities.
+remove_role('rtm_team_manager');
+foreach (wp_roles()->role_objects as $rtm_role) {
+    foreach (array('edit_rtm_members', 'edit_others_rtm_members', 'edit_private_rtm_members', 'edit_published_rtm_members', 'publish_rtm_members', 'read_private_rtm_members', 'delete_rtm_members', 'delete_private_rtm_members', 'delete_published_rtm_members', 'delete_others_rtm_members', 'rtm_manage_all_teams', 'rtm_manage_publications') as $rtm_cap) {
+        $rtm_role->remove_cap($rtm_cap);
+    }
+}
+delete_option('rtm_caps_version');
+delete_metadata('user', 0, 'rtm_managed_teams', '', true);
 
 // Drop the custom publications table.
 $rtm_table = $wpdb->prefix . 'rtm_publications';

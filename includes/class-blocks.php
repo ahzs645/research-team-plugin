@@ -54,6 +54,67 @@ class RTM_Blocks {
         
         // Register Team Member Field Block
         $this->register_team_member_field_block();
+
+        // Team Section block (header / roster / publications for a chosen team)
+        wp_register_script(
+            'rtm-team-section-block',
+            plugin_dir_url(dirname(__FILE__)) . 'assets/team-section-block.js',
+            array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-server-side-render'),
+            RTM_VERSION,
+            true
+        );
+        register_block_type('rtm/team-section', array(
+            'api_version'     => 3,
+            'title'           => __('Team Section', 'research-team-manager'),
+            'category'        => 'rtm-blocks',
+            'editor_script'   => 'rtm-team-section-block',
+            'attributes'      => array(
+                'team'    => array('type' => 'number', 'default' => 0),
+                'section' => array('type' => 'string', 'default' => 'roster'),
+                'heading' => array('type' => 'string', 'default' => ''),
+            ),
+            'supports'        => array('html' => false, 'align' => array('wide', 'full')),
+            'render_callback' => array($this, 'render_team_section_block'),
+        ));
+    }
+
+    /**
+     * Render a Team Section with the matching shortcode. Team 0 means the
+     * team of the page being viewed.
+     */
+    public function render_team_section_block($attributes) {
+        $team    = !empty($attributes['team']) ? (int) $attributes['team'] : '';
+        $heading = isset($attributes['heading']) ? trim((string) $attributes['heading']) : '';
+        switch ($attributes['section'] ?? 'roster') {
+            case 'header':
+                $html = rtm_team_header_shortcode(array('team' => $team));
+                break;
+            case 'publications':
+                $html = rtm_team_publications_shortcode(array('team' => $team, 'heading' => $heading !== '' ? $heading : 'Publications'));
+                break;
+            default:
+                $html = rtm_team_roster_shortcode(array('team' => $team, 'heading' => $heading !== '' ? $heading : 'Lab Team'));
+        }
+        return $html !== '' ? '<div ' . get_block_wrapper_attributes(array('class' => 'rtm-team-section')) . '>' . $html . '</div>' : '';
+    }
+
+    /**
+     * Teams offered by the editor's team pickers.
+     */
+    public static function editor_data() {
+        $teams = array();
+        if (rtm_is_multiple_teams()) {
+            $terms = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'orderby' => 'name'));
+            foreach (is_wp_error($terms) ? array() : $terms as $term) {
+                $teams[] = array('id' => (int) $term->term_id, 'name' => $term->name, 'lead' => rtm_team_lead_text($term->term_id));
+            }
+        }
+        return array(
+            'multiple'         => rtm_is_multiple_teams(),
+            'teams'            => $teams,
+            // WordPress 7.0 changed the Query Loop's taxQuery to {include, exclude}.
+            'taxIncludeFormat' => version_compare(get_bloginfo('version'), '7.0-alpha', '>='),
+        );
     }
     
     /**
@@ -166,9 +227,12 @@ class RTM_Blocks {
         wp_enqueue_script(
             'rtm-block-editor-extensions',
             plugin_dir_url(dirname(__FILE__)) . 'assets/block-editor-extensions.js',
-            array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-compose', 'wp-hooks'),
-            '1.0.0',
+            array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-compose', 'wp-hooks'),
+            RTM_VERSION,
             true
         );
+        $data = 'window.rtmBlockData = ' . wp_json_encode(self::editor_data()) . ';';
+        wp_add_inline_script('rtm-block-editor-extensions', $data, 'before');
+        wp_add_inline_script('rtm-team-section-block', $data, 'before');
     }
 }

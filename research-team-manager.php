@@ -1,12 +1,15 @@
 <?php
 /**
  * Plugin Name: Research Team Manager Simple
- * Plugin URI: https://example.com/research-team-manager
+ * Plugin URI: https://github.com/ahzs645/research-team-plugin
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.3.2
+ * Version: 1.4.0
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
+ * Requires at least: 6.5
+ * Requires PHP: 7.4
+ * Update URI: https://github.com/ahzs645/research-team-plugin
  */
 
 if (!defined('ABSPATH')) {
@@ -14,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.3.2');
+define('RTM_VERSION', '1.4.0');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -209,6 +212,9 @@ function rtm_activate_plugin() {
     
     // Create default member status terms
     rtm_create_default_member_status_terms();
+
+    // Member capabilities and the team manager (PI) role
+    RTM_Team_Access::install_caps();
     
     // Flush rewrite rules
     flush_rewrite_rules();
@@ -328,7 +334,10 @@ function rtm_register_team_member_post_type() {
         'show_in_menu'          => true,
         'query_var'             => true,
         'rewrite'               => array('slug' => 'team-member'),
-        'capability_type'       => 'post',
+        // Own capabilities (edit_rtm_members, …) so team managers can be
+        // given members without blog posts. See RTM_Team_Access.
+        'capability_type'       => array('rtm_member', 'rtm_members'),
+        'map_meta_cap'          => true,
         'has_archive'           => true,
         'hierarchical'          => false,
         'menu_position'         => 20,
@@ -462,7 +471,7 @@ function rtm_add_admin_menus() {
         'edit.php?post_type=rtm_team_member',
         'Publications',
         'Publications',
-        'manage_options',
+        'rtm_manage_publications',
         'rtm-publications',
         'rtm_publications_page'
     );
@@ -619,6 +628,85 @@ function rtm_team_settings_page() {
             </div>
 
         <?php endif; ?>
+
+        <?php if ($mode === 'multiple'): rtm_team_workspaces_card($teams); endif; ?>
+
+        <?php // Researcher directory (formerly the University Research Network add-on) ?>
+        <div class="card" style="max-width:760px; margin-top:20px;">
+            <h2><?php esc_html_e('Researcher directory', 'research-team-manager'); ?></h2>
+            <?php if (RTM_Network::legacy_addon_active()): ?>
+                <p class="description"><?php esc_html_e('The University Research Network add-on is active and provides the researcher directory. Deactivate it to use the built-in version; existing researchers, filters and pages are kept.', 'research-team-manager'); ?></p>
+            <?php else: ?>
+                <p class="description"><?php esc_html_e('A public researcher directory: your own directory fields (for example Faculty or Department), institutional affiliations, keyword search, the Researcher Field / Researcher Filters / Directory Tabs blocks and the researcher directory and profile patterns.', 'research-team-manager'); ?></p>
+                <?php if (RTM_Network::is_enabled()): ?>
+                    <p><a class="button" href="<?php echo esc_url(RTM_Network_Fields::page_url()); ?>"><?php esc_html_e('Edit directory fields', 'research-team-manager'); ?></a></p>
+                <?php endif; ?>
+                <form method="post" action="">
+                    <?php wp_nonce_field('rtm_network_toggle', 'rtm_network_toggle_nonce'); ?>
+                    <input type="hidden" name="rtm_action" value="network_toggle" />
+                    <p><label><input type="checkbox" name="rtm_network_enabled" value="1" <?php checked(RTM_Network::is_enabled()); ?> /> <?php esc_html_e('Enable the researcher directory', 'research-team-manager'); ?></label></p>
+                    <?php submit_button(__('Save researcher directory setting', 'research-team-manager'), 'secondary', 'submit', false); ?>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Team Settings card: a sidebar menu per team (PI) and who may manage which team.
+ *
+ * @param WP_Term[] $teams
+ */
+function rtm_team_workspaces_card($teams) {
+    $chosen = RTM_Team_Access::menu_team_ids();
+    $access = RTM_Team_Access::access_mode();
+    ?>
+    <div class="card" style="max-width:760px; margin-top:20px;">
+        <h2><?php esc_html_e('Team workspaces', 'research-team-manager'); ?></h2>
+        <p class="description"><?php esc_html_e('Give each team (PI) its own sidebar menu with its members, publications and team settings, and decide who can manage which team.', 'research-team-manager'); ?></p>
+        <form method="post" action="">
+            <?php wp_nonce_field('rtm_team_workspaces', 'rtm_team_workspaces_nonce'); ?>
+            <input type="hidden" name="rtm_action" value="team_workspaces" />
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><?php esc_html_e('Sidebar menus', 'research-team-manager'); ?></th>
+                    <td>
+                        <label><input type="checkbox" name="rtm_team_menus" value="1" <?php checked(RTM_Team_Access::menus_enabled()); ?> /> <?php esc_html_e('Show a sidebar menu for each team', 'research-team-manager'); ?></label>
+                        <p style="margin-top:10px;"><?php esc_html_e('Menu name:', 'research-team-manager'); ?>
+                            <label style="margin-left:8px;"><input type="radio" name="rtm_team_menu_label" value="pi" <?php checked(RTM_Team_Access::menu_label_mode(), 'pi'); ?> /> <?php esc_html_e('PI name(s)', 'research-team-manager'); ?></label>
+                            <label style="margin-left:8px;"><input type="radio" name="rtm_team_menu_label" value="team" <?php checked(RTM_Team_Access::menu_label_mode(), 'team'); ?> /> <?php esc_html_e('Team name', 'research-team-manager'); ?></label>
+                        </p>
+                        <?php if ($teams): ?>
+                            <fieldset style="margin-top:10px;">
+                                <legend><?php esc_html_e('Teams with a menu (none ticked = every team):', 'research-team-manager'); ?></legend>
+                                <?php foreach ($teams as $team): $lead = rtm_team_lead_text($team->term_id); ?>
+                                    <label style="display:block; margin:4px 0;"><input type="checkbox" name="rtm_team_menu_teams[]" value="<?php echo (int) $team->term_id; ?>" <?php checked(in_array((int) $team->term_id, $chosen, true)); ?> /> <?php echo esc_html($team->name . ($lead ? ' — ' . $lead : '')); ?></label>
+                                <?php endforeach; ?>
+                            </fieldset>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Team access', 'research-team-manager'); ?></th>
+                    <td>
+                        <fieldset>
+                            <label style="display:block; margin-bottom:8px;"><input type="radio" name="rtm_team_access" value="open" <?php checked($access, 'open'); ?> /> <strong><?php esc_html_e('Open', 'research-team-manager'); ?></strong> — <?php esc_html_e('anyone who can manage team members can open every team.', 'research-team-manager'); ?></label>
+                            <label style="display:block;"><input type="radio" name="rtm_team_access" value="restricted" <?php checked($access, 'restricted'); ?> /> <strong><?php esc_html_e('Restricted', 'research-team-manager'); ?></strong> — <?php esc_html_e('administrators and editors manage every team; other users only see and edit the teams assigned to them, and only through their team menus.', 'research-team-manager'); ?></label>
+                        </fieldset>
+                        <p class="description" style="margin-top:10px;">
+                            <?php printf(
+                                /* translators: 1: Add New User URL, 2: Users URL */
+                                wp_kses_post(__('To set up a PI: <a href="%1$s">add a user</a> with the “Research Team Manager (PI)” role and tick their team under “Research teams”. You can also assign managers on each team’s edit screen. <a href="%2$s">View users</a>.', 'research-team-manager')),
+                                esc_url(admin_url('user-new.php')),
+                                esc_url(admin_url('users.php?role=' . RTM_Team_Access::ROLE))
+                            ); ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button(__('Save team workspace settings', 'research-team-manager'), 'secondary', 'submit', false); ?>
+        </form>
     </div>
     <?php
 }
@@ -629,6 +717,23 @@ function rtm_team_settings_handle_post() {
         return;
     }
     $action = sanitize_key($_POST['rtm_action']);
+
+    // Team sidebar menus and access model.
+    if ($action === 'team_workspaces' && check_admin_referer('rtm_team_workspaces', 'rtm_team_workspaces_nonce')) {
+        update_option('rtm_team_menus', empty($_POST['rtm_team_menus']) ? '0' : '1');
+        update_option('rtm_team_menu_label', ($_POST['rtm_team_menu_label'] ?? '') === 'team' ? 'team' : 'pi');
+        update_option('rtm_team_menu_teams', array_values(array_filter(array_map('intval', (array) ($_POST['rtm_team_menu_teams'] ?? array())))));
+        update_option('rtm_team_access', ($_POST['rtm_team_access'] ?? '') === 'restricted' ? 'restricted' : 'open');
+        rtm_admin_notice(__('Team workspace settings saved. Reload the page to see the sidebar change.', 'research-team-manager'));
+        return;
+    }
+
+    // Researcher directory on/off. Takes effect on the next page load.
+    if ($action === 'network_toggle' && check_admin_referer('rtm_network_toggle', 'rtm_network_toggle_nonce')) {
+        update_option(RTM_Network::OPTION, empty($_POST['rtm_network_enabled']) ? '0' : '1');
+        rtm_admin_notice(__('Researcher directory setting saved. Reload any open editors to see the change.', 'research-team-manager'));
+        return;
+    }
 
     // Change active team (already in single mode).
     if ($action === 'update_active' && check_admin_referer('rtm_update_active', 'rtm_update_active_nonce')) {
@@ -746,11 +851,25 @@ function rtm_publications_page() {
     $table_name = $wpdb->prefix . 'rtm_publications';
     $multiple   = rtm_is_multiple_teams();
 
+    $is_admin   = current_user_can('manage_options');
+
     // Which team are we scoping to? (0 = all / global)
     $selected_team = isset($_REQUEST['rtm_team']) ? (int) $_REQUEST['rtm_team'] : 0;
     if (!$multiple) {
         $active = rtm_get_active_team();
         $selected_team = $active ? (int) $active->term_id : 0;
+    }
+
+    // Team managers who are not administrators work on one of their own teams.
+    $manageable = $multiple ? RTM_Team_Access::manageable_team_ids() : array();
+    if ($multiple && !$is_admin && !in_array($selected_team, $manageable, true)) {
+        if (!$manageable) {
+            wp_die(esc_html__('You are not assigned to any research team.', 'research-team-manager'));
+        }
+        $selected_team = $manageable[0];
+    }
+    if (!$multiple && !$is_admin) {
+        wp_die(esc_html__('Only administrators manage publications in single-team mode.', 'research-team-manager'));
     }
 
     // Handle sync request
@@ -763,8 +882,8 @@ function rtm_publications_page() {
         rtm_preview_publications($selected_team);
     }
 
-    // Handle import request
-    if (isset($_POST['import_json']) && wp_verify_nonce($_POST['rtm_import_nonce'], 'rtm_import_json')) {
+    // Handle import request (reads a file on the server: administrators only)
+    if ($is_admin && isset($_POST['import_json']) && wp_verify_nonce($_POST['rtm_import_nonce'], 'rtm_import_json')) {
         rtm_import_json_publications($selected_team);
     }
 
@@ -785,6 +904,11 @@ function rtm_publications_page() {
         $teams = array();
     }
     $team_names    = $multiple ? wp_list_pluck($teams, 'name', 'term_id') : array();
+    if (!$is_admin) {
+        $teams = array_values(array_filter($teams, function ($team) use ($manageable) {
+            return in_array((int) $team->term_id, $manageable, true);
+        }));
+    }
     $scholar_in_use = rtm_get_scholar_id_for_team($selected_team);
     $pub_source     = RTM_Pub_Sources::get_source($selected_team);
     $pub_source_lbl = RTM_Pub_Sources::label($pub_source);
@@ -799,7 +923,7 @@ function rtm_publications_page() {
                 <input type="hidden" name="page" value="rtm-publications" />
                 <label for="rtm_team"><strong>Team:</strong></label>
                 <select name="rtm_team" id="rtm_team" onchange="this.form.submit()">
-                    <option value="0" <?php selected($selected_team, 0); ?>>All teams</option>
+                    <?php if ($is_admin): ?><option value="0" <?php selected($selected_team, 0); ?>>All teams</option><?php endif; ?>
                     <?php foreach ($teams as $team): ?>
                         <option value="<?php echo esc_attr($team->term_id); ?>" <?php selected($selected_team, $team->term_id); ?>>
                             <?php echo esc_html($team->name); ?>
@@ -816,8 +940,10 @@ function rtm_publications_page() {
                 esc_html__('Source: %s', 'research-team-manager'),
                 '<strong>' . esc_html($pub_source_lbl) . '</strong>'
             ); ?>
+            <?php if ($is_admin): ?>
             &nbsp;·&nbsp;
             <a href="<?php echo esc_url(admin_url('edit.php?post_type=rtm_team_member&page=rtm-scholar-settings')); ?>"><?php esc_html_e('Change in Publications Settings', 'research-team-manager'); ?></a>
+            <?php endif; ?>
         </p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
@@ -846,11 +972,13 @@ function rtm_publications_page() {
                     </form>
                 <?php endif; ?>
 
+                <?php if ($is_admin): ?>
                 <form method="post" style="display: inline-block;">
                     <?php wp_nonce_field('rtm_import_json', 'rtm_import_nonce'); ?>
                     <input type="hidden" name="rtm_team" value="<?php echo esc_attr($selected_team); ?>" />
                     <input type="submit" name="import_json" class="button button-secondary" value="<?php esc_attr_e('Import from JSON File', 'research-team-manager'); ?>" />
                 </form>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -1493,6 +1621,8 @@ function rtm_member_team_filter($post_type) {
         'hide_empty'      => false,
         'show_count'      => true,
         'orderby'         => 'name',
+        // Scoped team managers only filter by their own teams.
+        'include'         => RTM_Team_Access::is_scoped() ? (RTM_Team_Access::manageable_team_ids() ?: array(0)) : array(),
     ));
 }
 
@@ -1508,6 +1638,13 @@ function rtm_member_team_metabox() {
 }
 function rtm_member_team_metabox_cb($post) {
     $terms = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'orderby' => 'name'));
+    // Scoped team managers only see their own teams; other assignments are kept on save.
+    if (!is_wp_error($terms) && RTM_Team_Access::is_scoped()) {
+        $mine  = RTM_Team_Access::manageable_team_ids();
+        $terms = array_values(array_filter($terms, function ($t) use ($mine) {
+            return in_array((int) $t->term_id, $mine, true);
+        }));
+    }
     if (empty($terms) || is_wp_error($terms)) {
         printf(
             '<p>%s</p>',
@@ -1531,6 +1668,7 @@ function rtm_member_team_metabox_cb($post) {
     }
 
     echo '<p class="description">' . esc_html__('Which research team(s) does this member belong to?', 'research-team-manager') . '</p>';
+    echo '<input type="hidden" name="rtm_context_team" value="' . (int) $preselect . '" />';
     // Hidden 0 lets WordPress clear all teams when none are ticked.
     echo '<input type="hidden" name="tax_input[rtm_research_team][]" value="0" />';
     echo '<div style="max-height:260px; overflow:auto; border:1px solid #dcdcde; border-radius:4px; padding:8px 10px;">';
@@ -2467,6 +2605,15 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-teams.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-zotero.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-positions.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-publications-sources.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-network-fields.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-network.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-updater.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-team-access.php';
+
+// Researcher directory and GitHub release updates.
+RTM_Network::boot();
+RTM_Updater::boot();
+RTM_Team_Access::boot();
 
 // Per-lab team settings. Instantiated at load time (not on `init`) so its own
 // `init` hook for register_term_meta() is in place before `init` fires.
