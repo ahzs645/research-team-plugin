@@ -141,7 +141,7 @@ check(strpos(RTM_Network::field_html('links', 2), 'ORCID') !== false, 'Source OR
 check(strpos(RTM_Network::field_html('source', 2), 'https://www.unbc.ca/grace') !== false, 'Source link missing.');
 
 // First run enables the module only when directory data already exists.
-class FakeWpdb { public $postmeta = 'wp_postmeta'; public $result = null; public function get_var($sql) { return $this->result; } }
+class FakeWpdb { public $postmeta = 'wp_postmeta'; public $term_taxonomy = 'wp_term_taxonomy'; public $result = null; public function get_var($sql) { return $this->result; } }
 $GLOBALS['wpdb'] = new FakeWpdb();
 check(RTM_Network::is_enabled() === false && $options['rtm_network_enabled'] === '0', 'Fresh site enabled the directory.');
 unset($options['rtm_network_enabled']);
