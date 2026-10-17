@@ -7,9 +7,8 @@
  * names and pattern names are used, so existing pages, Query Loops and
  * imported records keep working after the add-on is deactivated.
  *
- * Adds profile taxonomies (faculty, department, appointment, supervision,
- * theme, membership, institution), institutional affiliations, a keyword
- * search index, the Researcher Field / Researcher Filters / Directory Tabs
+ * Adds configurable directory fields (see RTM_Network_Fields), institutional
+ * affiliations, a keyword search index, the Researcher Field / Researcher Filters / Directory Tabs
  * blocks, a Researcher Directory Query Loop variation and directory/profile
  * patterns. Lab assignments stay in the Research Team taxonomy.
  */
@@ -25,17 +24,10 @@ class RTM_Network {
     /** Meta keys whose changes refresh the search index. */
     const INDEXED_META = array('_rtmn_unbc_record', '_rtmn_affiliations', '_rtm_position', '_rtm_long_description', '_rtm_short_description');
 
-    /** Query-string filter key => taxonomy. */
-    const FILTERS = array(
-        'rn_faculty'     => 'rtmn_faculty',
-        'rn_department'  => 'rtmn_department',
-        'rn_appointment' => 'rtmn_appointment',
-        'rn_supervision' => 'rtmn_supervision',
-        'rn_topic'       => 'rtm_research_area',
-        'rn_theme'       => 'rtmn_theme',
-        'rn_membership'  => 'rtmn_membership',
-        'rn_institution' => 'rtmn_institution',
-    );
+    /** Indexed meta keys, including the configured text fields. */
+    public static function indexed_meta() {
+        return array_merge(self::INDEXED_META, array_values(wp_list_pluck(RTM_Network_Fields::text_fields(), 'meta_key')));
+    }
 
     /**
      * Boot after every plugin has loaded, so the former add-on is detected
@@ -55,7 +47,12 @@ class RTM_Network {
         if (!self::is_enabled()) {
             return;
         }
+        // Sites with data from the add-on keep its fields and wording.
+        if (get_option(RTM_Network_Fields::OPTION, null) === null || get_option(RTM_Network_Fields::SOURCES_OPTION, null) === null) {
+            RTM_Network_Fields::seed(self::has_existing_data());
+        }
 
+        RTM_Network_Fields::boot();
         add_action('init', array(__CLASS__, 'register'), 30);
         add_filter('register_taxonomy_args', array(__CLASS__, 'research_area_in_rest'), 10, 2);
         add_action('enqueue_block_editor_assets', array(__CLASS__, 'enqueue_editor_assets'));
@@ -66,7 +63,7 @@ class RTM_Network {
         add_action('set_object_terms', array(__CLASS__, 'index_on_terms'), 100, 4);
         add_action('updated_post_meta', array(__CLASS__, 'index_on_meta'), 100, 3);
         add_action('added_post_meta', array(__CLASS__, 'index_on_meta'), 100, 3);
-        add_action('add_meta_boxes', array(__CLASS__, 'add_meta_boxes'));
+        add_action('add_meta_boxes', array(__CLASS__, 'add_meta_boxes'), 10, 2);
 
         add_filter('query_loop_block_query_vars', array(__CLASS__, 'query_loop_vars'), 20, 2);
         add_filter('posts_search', array(__CLASS__, 'posts_search'), 20, 2);
@@ -106,18 +103,14 @@ class RTM_Network {
         return (bool) $found;
     }
 
-    /** Taxonomy => singular label. Filterable so sites can rename sections. */
+    /** Taxonomy => singular label for every configured list field. */
     public static function taxonomies() {
-        return apply_filters('rtm_network_taxonomies', array(
-            'rtmn_faculty'      => 'Faculty',
-            'rtmn_department'   => 'Department',
-            'rtmn_appointment'  => 'Appointment type',
-            'rtmn_supervision'  => 'Graduate supervision',
-            'rtm_research_area' => 'Research topic',
-            'rtmn_theme'        => 'Research theme',
-            'rtmn_membership'   => 'HRI membership',
-            'rtmn_institution'  => 'Institution / affiliation',
-        ));
+        return apply_filters('rtm_network_taxonomies', wp_list_pluck(RTM_Network_Fields::choice_fields(), 'label'));
+    }
+
+    /** Name of an import source ('directory' or 'network'), or '' when unset. */
+    private static function source_name($which) {
+        return trim((string) (RTM_Network_Fields::sources()[$which] ?? ''));
     }
 
     /** Public URL of the researcher directory page. */
@@ -136,25 +129,38 @@ class RTM_Network {
         }
         add_post_type_support('rtm_team_member', array('editor', 'custom-fields', 'revisions'));
 
-        $plural = array(
-            'rtmn_faculty'     => 'Faculties',
-            'rtmn_department'  => 'Departments',
-            'rtmn_appointment' => 'Appointment Types',
-            'rtmn_supervision' => 'Graduate Supervision',
-            'rtmn_theme'       => 'Research Themes',
-            'rtmn_membership'  => 'HRI Membership Categories',
-            'rtmn_institution' => 'Institutions / Affiliations',
-        );
+        // List fields are taxonomies; their values are managed from the
+        // Directory Fields screen rather than one menu entry each.
+        $plural  = array();
+        $columns = array();
+        foreach (RTM_Network_Fields::choice_fields() as $taxonomy => $field) {
+            if ($field['type'] === 'choice') {
+                $plural[$taxonomy]  = $field['plural'];
+                $columns[$taxonomy] = $field['column'];
+            }
+        }
         foreach (apply_filters('rtm_network_taxonomy_labels', $plural) as $name => $label) {
             register_taxonomy($name, array('rtm_team_member'), array(
                 'label'             => $label,
                 'public'            => false,
                 'show_ui'           => true,
-                'show_admin_column' => true,
+                'show_in_menu'      => false,
+                'show_admin_column' => !empty($columns[$name]),
                 'show_in_rest'      => true,
                 'hierarchical'      => false,
                 'rewrite'           => false,
                 'query_var'         => false,
+            ));
+        }
+        foreach (RTM_Network_Fields::text_fields() as $field) {
+            register_post_meta('rtm_team_member', $field['meta_key'], array(
+                'type'              => 'string',
+                'single'            => true,
+                'show_in_rest'      => true,
+                'sanitize_callback' => 'sanitize_text_field',
+                'auth_callback'     => function ($allowed, $key, $post_id) {
+                    return current_user_can('edit_post', $post_id);
+                },
             ));
         }
 
@@ -248,6 +254,11 @@ class RTM_Network {
     }
 
     public static function enqueue_editor_assets() {
+        $fields = array();
+        foreach (RTM_Network_Fields::all() as $field) {
+            $fields[] = array('value' => self::block_field_name($field), 'label' => $field['label']);
+        }
+        wp_add_inline_script('rtmn-editor', 'window.rtmnDirectoryFields = ' . wp_json_encode($fields) . ';', 'before');
         wp_enqueue_script('rtmn-editor');
         wp_enqueue_style('rtmn-directory');
     }
@@ -289,22 +300,14 @@ class RTM_Network {
         return self::clean_affiliations(get_post_meta($id, '_rtmn_affiliations', true));
     }
 
-    /** Normalized institution names for the Institution taxonomy. */
+    /** Normalized institution names for the Institution field (see Directory Fields → Imported records). */
     public static function institution_names($rows) {
         $names = array();
         foreach (self::clean_affiliations($rows) as $a) {
-            $org = trim($a['affiliation']);
-            if (!$org || in_array(strtolower($org), array('associate professor', 'stat 240'), true)) {
-                continue;
+            $org = RTM_Network_Fields::normalize_institution(trim($a['affiliation']));
+            if ($org !== '') {
+                $names[] = $org;
             }
-            if (preg_match('/\bunbc\b|univer(?:sity|isty) of northern british columbia/i', $org)) {
-                $org = 'University of Northern British Columbia';
-            } elseif (in_array(strtolower($org), array('ubc', 'university of british columbia'), true)) {
-                $org = 'University of British Columbia';
-            } elseif ($org === 'Northern Health Authority') {
-                $org = 'Northern Health';
-            }
-            $names[] = $org;
         }
         return array_values(array_unique($names));
     }
@@ -356,7 +359,27 @@ class RTM_Network {
         foreach (array_keys(self::taxonomies()) as $tax) {
             $parts[] = implode(' ', self::term_names($id, $tax));
         }
+        foreach (RTM_Network_Fields::text_fields() as $field) {
+            $parts[] = get_post_meta($id, $field['meta_key'], true);
+        }
         update_post_meta($id, '_rtmn_search', wp_strip_all_tags(implode(' ', $parts)));
+    }
+
+    /** Researcher Field value for a configured field (legacy names kept for saved blocks). */
+    public static function block_field_name($field) {
+        $legacy = array('topic' => 'topics', 'theme' => 'themes', 'membership' => 'membership');
+        if ($field['type'] !== 'text' && isset($legacy[$field['key']])) {
+            return $legacy[$field['key']];
+        }
+        return ($field['type'] === 'text' ? 'meta:' : 'tax:') . $field['key'];
+    }
+
+    /** The configured field a Researcher Field value refers to, if any. */
+    private static function configured_field($name) {
+        $legacy = array('topics' => 'topic', 'themes' => 'theme', 'membership' => 'membership');
+        $key    = $legacy[$name] ?? (preg_match('/^(?:tax|meta):([a-z0-9_]+)$/', $name, $m) ? $m[1] : '');
+        $fields = RTM_Network_Fields::all();
+        return $key !== '' && isset($fields[$key]) ? $fields[$key] : null;
     }
 
     public static function index_on_terms($id, $terms, $tt_ids, $taxonomy) {
@@ -366,7 +389,7 @@ class RTM_Network {
     }
 
     public static function index_on_meta($meta_id, $id, $key) {
-        if (in_array($key, self::INDEXED_META, true)) {
+        if (in_array($key, self::indexed_meta(), true)) {
             self::index($id);
         }
     }
@@ -381,7 +404,7 @@ class RTM_Network {
             $args['rtmn_search'] = $search;
         }
         $tax_query = $args['tax_query'] ?? array();
-        foreach (self::FILTERS as $key => $tax) {
+        foreach (RTM_Network_Fields::filters() as $key => $tax) {
             $value = self::request_value($key);
             if ($value === '') {
                 continue;
@@ -425,7 +448,7 @@ class RTM_Network {
         $url        = self::directory_url();
         $labels     = self::taxonomies();
         $active     = 0;
-        foreach (array_keys(self::FILTERS) as $key) {
+        foreach (array_keys(RTM_Network_Fields::filters()) as $key) {
             if (self::request_value($key) !== '') {
                 $active++;
             }
@@ -443,7 +466,7 @@ class RTM_Network {
       <input type="hidden" name="directory" value="researchers" />
       <div id="<?php echo esc_attr($panel_id); ?>" class="rtmn-filter-panel" hidden>
         <div class="rtmn-filter-grid">
-        <?php foreach (self::FILTERS as $key => $tax): $label = $labels[$tax] ?? $tax; ?>
+        <?php foreach (RTM_Network_Fields::filters() as $key => $tax): $label = $labels[$tax] ?? $tax; ?>
           <label for="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?><select aria-label="<?php echo esc_attr($label); ?>" id="<?php echo esc_attr($key); ?>" name="<?php echo esc_attr($key); ?>"><option value="">All</option><?php
             $terms = get_terms(array('taxonomy' => $tax, 'hide_empty' => true, 'orderby' => 'name'));
             if (!is_wp_error($terms)) {
@@ -489,19 +512,43 @@ class RTM_Network {
         if (get_post_type($id) !== 'rtm_team_member' || (get_post_status($id) !== 'publish' && !current_user_can('edit_post', $id))) {
             return '';
         }
-        $field = $attrs['field'] ?? 'position';
-        $html  = self::field_html($field, $id);
-        return $html !== '' ? '<div ' . get_block_wrapper_attributes(array('class' => 'rtmn-field rtmn-field--' . sanitize_html_class($field))) . '>' . $html . '</div>' : '';
+        $field  = $attrs['field'] ?? 'position';
+        $html   = self::field_html($field, $id);
+        $config = self::configured_field($field);
+        $wrap   = array('class' => 'rtmn-field rtmn-field--' . sanitize_html_class(str_replace(':', '-', $field)));
+        if ($config) {
+            $wrap['data-label'] = $config['label'];
+        }
+        return $html !== '' ? '<div ' . get_block_wrapper_attributes($wrap) . '>' . $html . '</div>' : '';
     }
 
     /** Inner HTML for one Researcher Field, or '' when there is nothing to show. */
     public static function field_html($field, $id) {
-        $r    = self::source_record($id);
-        $html = '';
+        $r       = self::source_record($id);
+        $sources = RTM_Network_Fields::sources();
+        $src     = self::source_name('directory');
+        $html    = '';
+
+        // Configured fields: a list field shows its values as tags, a text field its text.
+        $config = self::configured_field($field);
+        if ($field !== 'topics' && $config) {
+            if ($config['type'] === 'text') {
+                return esc_html((string) get_post_meta($id, $config['meta_key'], true));
+            }
+            foreach (self::term_names($id, $config['taxonomy']) as $name) {
+                $html .= '<span class="rtmn-tag">' . esc_html($name) . '</span>';
+            }
+            return $html;
+        }
+        if (in_array($field, array('themes', 'membership'), true) || strpos($field, 'tax:') === 0 || strpos($field, 'meta:') === 0) {
+            return ''; // field removed in Directory Fields
+        }
+
         switch ($field) {
             case 'portrait':
                 $html = get_the_post_thumbnail($id, 'medium', array('class' => 'rtmn-portrait', 'alt' => get_the_title($id)));
-                if (!$html && !empty($r['portrait_url']) && preg_match('#^https://www\.unbc\.ca/sites/#', $r['portrait_url'])) {
+                $trusted = (string) $sources['portrait_base'];
+                if (!$html && !empty($r['portrait_url']) && $trusted !== '' && strpos($r['portrait_url'], $trusted) === 0 && strpos($r['portrait_url'], 'https://') === 0) {
                     $html = '<img class="rtmn-portrait rtmn-source-portrait" src="' . esc_url($r['portrait_url']) . '" alt="' . esc_attr(get_the_title($id)) . '" width="160" height="160" loading="lazy" decoding="async" /><span hidden class="rtmn-initials rtmn-portrait-fallback" aria-label="No photograph available">' . esc_html(self::initials($id)) . '</span>';
                 } elseif (!$html) {
                     $html = '<span class="rtmn-initials" aria-label="No photograph supplied">' . esc_html(self::initials($id)) . '</span>';
@@ -515,15 +562,17 @@ class RTM_Network {
             case 'institution':
             case 'affiliations':
                 $names = self::institution_names(self::affiliations($id));
-                if (!$names && $r) {
-                    $names = array('University of Northern British Columbia');
+                if (!$names && $r && $sources['institution'] !== '') {
+                    $names = array($sources['institution']);
                 }
                 $html = esc_html(implode(' · ', $field === 'institution' ? array_slice($names, 0, 1) : $names));
                 break;
 
             case 'academic_units':
-                $deps = self::term_names($id, 'rtmn_department');
-                $fac  = self::term_names($id, 'rtmn_faculty');
+                $dep_tax = RTM_Network_Fields::taxonomy_for('department');
+                $fac_tax = RTM_Network_Fields::taxonomy_for('faculty');
+                $deps    = $dep_tax ? self::term_names($id, $dep_tax) : array();
+                $fac     = $fac_tax ? self::term_names($id, $fac_tax) : array();
                 $html = $deps ? '<p>' . esc_html(implode(' · ', $deps)) . '</p>' : '';
                 if ($fac) {
                     $html .= '<p class="rtmn-muted">' . esc_html(implode(' · ', $fac)) . '</p>';
@@ -541,11 +590,11 @@ class RTM_Network {
                     return $v !== $current;
                 }));
                 if (!empty($r['historical_listing'])) {
-                    $html = '<p>Listed under former faculty on a UNBC departmental roster.</p>';
+                    $html = '<p>' . esc_html(sprintf('Listed under former faculty on a %s departmental roster.', $src !== '' ? $src : 'university')) . '</p>';
                 } elseif (!empty($r['appointment_under_review'])) {
-                    $html = '<p>UNBC has two profiles with different appointment titles: ' . esc_html(implode('; ', $r['positions'])) . '.</p>';
+                    $html = '<p>' . esc_html(sprintf('%s has two profiles with different appointment titles: ', $src !== '' ? $src : 'The source directory') . implode('; ', $r['positions'])) . '.</p>';
                 } elseif ($values) {
-                    $html = '<p>UNBC-listed appointments: ' . esc_html(implode('; ', $values)) . '</p>';
+                    $html = '<p>' . esc_html(($src !== '' ? $src . '-listed appointments: ' : 'Listed appointments: ') . implode('; ', $values)) . '</p>';
                 }
                 $lab_role = get_post_meta($id, '_rtmn_lab_role', true);
                 if ($lab_role) {
@@ -556,7 +605,7 @@ class RTM_Network {
             case 'supervision':
                 $states = $r['supervision_status'] ?? array();
                 if ($states && empty($r['historical_listing']) && empty($r['appointment_under_review'])) {
-                    $html = '<p>' . esc_html(implode('; ', $states)) . '. <span class="rtmn-muted">As reported by UNBC' . (!empty($r['retrieved_at']) ? ' on ' . esc_html(wp_date('F j, Y', strtotime($r['retrieved_at']))) : '') . '.</span></p>';
+                    $html = '<p>' . esc_html(implode('; ', $states)) . '. <span class="rtmn-muted">As reported by ' . esc_html($src !== '' ? $src : 'the source directory') . (!empty($r['retrieved_at']) ? ' on ' . esc_html(wp_date('F j, Y', strtotime($r['retrieved_at']))) : '') . '.</span></p>';
                     if (!empty($r['supervision_programs'])) {
                         $html .= '<p>Programs: ' . esc_html(implode('; ', $r['supervision_programs'])) . '</p>';
                     }
@@ -566,13 +615,10 @@ class RTM_Network {
                 break;
 
             case 'topics':
-            case 'themes':
-            case 'membership':
-                $tax = array('topics' => 'rtm_research_area', 'themes' => 'rtmn_theme', 'membership' => 'rtmn_membership')[$field];
-                foreach (self::term_names($id, $tax) as $name) {
+                foreach (self::term_names($id, RTM_Network_Fields::TOPIC_TAXONOMY) as $name) {
                     $html .= '<span class="rtmn-tag">' . esc_html($name) . '</span>';
                 }
-                if (!$html && $field === 'topics') {
+                if (!$html) {
                     $html = '<span class="rtmn-muted">Research topics not specified</span>';
                 }
                 break;
@@ -589,7 +635,7 @@ class RTM_Network {
                 }
                 foreach (array_filter($r['email'] ?? array(), 'is_email') as $email) {
                     if (strtolower($email) !== strtolower((string) $current)) {
-                        $html .= '<a class="rtmn-contact-link" href="mailto:' . esc_attr($email) . '">UNBC-listed email</a>';
+                        $html .= '<a class="rtmn-contact-link" href="mailto:' . esc_attr($email) . '">' . esc_html($src !== '' ? $src . '-listed email' : 'Directory email') . '</a>';
                     }
                 }
                 break;
@@ -613,11 +659,12 @@ class RTM_Network {
             case 'source':
                 $snapshot = get_post_meta($id, '_rtmn_source_snapshot', true);
                 if ($snapshot) {
-                    $html .= '<p class="rtmn-muted">HRI snapshot: ' . esc_html(wp_date('F j, Y', strtotime($snapshot))) . '.</p>';
+                    $net   = self::source_name('network');
+                    $html .= '<p class="rtmn-muted">' . esc_html(($net !== '' ? $net . ' snapshot: ' : 'Network snapshot: ') . wp_date('F j, Y', strtotime($snapshot))) . '.</p>';
                 }
                 if (!empty($r['source_url'])) {
                     $checked = !empty($r['retrieved_at']) ? ' <span class="rtmn-muted">· Source checked ' . esc_html(wp_date('F j, Y', strtotime($r['retrieved_at']))) . '</span>' : '';
-                    $html   .= '<div class="rtmn-field--unbc-source"><p><a class="rtmn-contact-link" href="' . esc_url($r['source_url']) . '" target="_blank" rel="noopener noreferrer">UNBC profile ↗</a>' . $checked . '</p></div>';
+                    $html   .= '<div class="rtmn-field--unbc-source"><p><a class="rtmn-contact-link" href="' . esc_url($r['source_url']) . '" target="_blank" rel="noopener noreferrer">' . esc_html(($src !== '' ? $src : 'Directory') . ' profile') . ' ↗</a>' . $checked . '</p></div>';
                 }
                 break;
         }
@@ -627,7 +674,7 @@ class RTM_Network {
     private static function links_html($id, $record) {
         $links = array(
             'Official profile'     => get_post_meta($id, '_rtm_external_url', true),
-            'HRI-supplied profile' => get_post_meta($id, '_rtmn_source_profile', true),
+            (self::source_name('network') !== '' ? self::source_name('network') . '-supplied profile' : 'Network profile') => get_post_meta($id, '_rtmn_source_profile', true),
             'Website'              => get_post_meta($id, '_rtm_website', true),
             'Google Scholar'       => get_post_meta($id, '_rtm_google_scholar_url', true),
             'ORCID'                => get_post_meta($id, '_rtm_orcid', true),
@@ -688,7 +735,8 @@ class RTM_Network {
         if (strpos($class, 'rtmn-section-about') !== false && !get_post_meta($id, '_rtm_long_description', true) && !get_post_meta($id, '_rtm_short_description', true) && !trim(get_post_field('post_content', $id))) {
             return '';
         }
-        if (strpos($class, 'rtmn-section-research') !== false && !self::term_names($id, 'rtm_research_area') && !self::term_names($id, 'rtmn_theme') && empty(self::source_record($id)['expertise_terms'])) {
+        $theme = RTM_Network_Fields::taxonomy_for('theme');
+        if (strpos($class, 'rtmn-section-research') !== false && !self::term_names($id, 'rtm_research_area') && (!$theme || !self::term_names($id, $theme)) && empty(self::source_record($id)['expertise_terms'])) {
             return '';
         }
         return $pre;
@@ -707,9 +755,13 @@ class RTM_Network {
      * Admin meta boxes
      * ---------------------------------------------------------------- */
 
-    public static function add_meta_boxes() {
-        add_meta_box('rtmn-affiliations', 'Research network affiliations', array(__CLASS__, 'affiliation_box'), 'rtm_team_member', 'normal');
-        add_meta_box('rtmn-unbc-source', 'UNBC source and review notes', array(__CLASS__, 'source_box'), 'rtm_team_member', 'normal');
+    public static function add_meta_boxes($post_type = '', $post = null) {
+        add_meta_box('rtmn-affiliations', 'Directory details', array(__CLASS__, 'affiliation_box'), 'rtm_team_member', 'normal');
+        // Only members imported from an external directory have a source record.
+        if ($post instanceof WP_Post && self::source_record($post->ID)) {
+            $src = self::source_name('directory');
+            add_meta_box('rtmn-unbc-source', ($src !== '' ? $src . ' source' : 'Directory source') . ' and review notes', array(__CLASS__, 'source_box'), 'rtm_team_member', 'normal');
+        }
     }
 
     public static function affiliation_box($post) {
@@ -722,17 +774,33 @@ class RTM_Network {
                 $i + 1, $i, esc_attr($rows[$i]['title'] ?? ''), $i, esc_attr($rows[$i]['affiliation'] ?? '')
             );
         }
-        echo '<p>HRI source ID: ' . esc_html(get_post_meta($post->ID, '_rtmn_source_id', true) ?: 'Not imported') . '</p>';
+        $source_id = get_post_meta($post->ID, '_rtmn_source_id', true);
+        if ($source_id) {
+            $net = self::source_name('network');
+            echo '<p>' . esc_html(($net !== '' ? $net . ' source ID: ' : 'Source ID: ') . $source_id) . '</p>';
+        }
+        $text = RTM_Network_Fields::text_fields();
+        if ($text) {
+            echo '<table class="form-table" role="presentation">';
+            foreach ($text as $field) {
+                printf(
+                    '<tr><th scope="row"><label for="rtmn_field_%1$s">%2$s</label></th><td><input type="text" class="regular-text" id="rtmn_field_%1$s" name="rtmn_fields[%1$s]" value="%3$s" /></td></tr>',
+                    esc_attr($field['key']), esc_html($field['label']), esc_attr(get_post_meta($post->ID, $field['meta_key'], true))
+                );
+            }
+            echo '</table>';
+        }
+        printf('<p class="description"><a href="%s">%s</a></p>', esc_url(RTM_Network_Fields::page_url()), esc_html__('Add or change directory fields', 'research-team-manager'));
     }
 
     public static function source_box($post) {
         $r = self::source_record($post->ID);
         if (!$r) {
-            echo '<p>No UNBC source linked.</p>';
             return;
         }
         if (!empty($r['source_url'])) {
-            echo '<p><a target="_blank" rel="noopener noreferrer" href="' . esc_url($r['source_url']) . '">Official UNBC profile</a></p>';
+            $src = self::source_name('directory');
+            echo '<p><a target="_blank" rel="noopener noreferrer" href="' . esc_url($r['source_url']) . '">' . esc_html('Official ' . ($src !== '' ? $src . ' ' : 'directory ') . 'profile') . '</a></p>';
         }
         foreach (array('positions' => 'Appointments', 'departments' => 'Departments', 'faculties' => 'Faculties', 'email' => 'Source email', 'expertise_terms' => 'Expertise', 'supervision_status' => 'Supervision') as $key => $label) {
             if (!empty($r[$key])) {
@@ -752,6 +820,15 @@ class RTM_Network {
             return;
         }
         update_post_meta($id, '_rtmn_affiliations', self::clean_affiliations(wp_unslash($_POST['rtmn_affiliations'] ?? array())));
-        wp_set_object_terms($id, self::institution_names(self::affiliations($id)), 'rtmn_institution', false);
+        $institution = RTM_Network_Fields::taxonomy_for('institution');
+        if ($institution) {
+            wp_set_object_terms($id, self::institution_names(self::affiliations($id)), $institution, false);
+        }
+        $values = (array) wp_unslash($_POST['rtmn_fields'] ?? array());
+        foreach (RTM_Network_Fields::text_fields() as $field) {
+            if (isset($values[$field['key']])) {
+                update_post_meta($id, $field['meta_key'], sanitize_text_field($values[$field['key']]));
+            }
+        }
     }
 }

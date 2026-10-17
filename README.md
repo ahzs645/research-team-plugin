@@ -185,13 +185,19 @@ Team members now use their own capabilities (`edit_rtm_members`, `edit_others_rt
 ### Researcher directory
 Formerly the separate *University Research Network* add-on. Turn it on under **Team Settings → Researcher directory**. It switches on by itself on sites that already have data from the add-on. It adds:
 
-- Taxonomies: Faculty, Department, Appointment type, Graduate supervision, Research theme, HRI membership, Institution / affiliation (research topics use **Research Areas**)
-- A *Research network affiliations* meta box (position + institution rows) and a read-only *UNBC source* box for imported members
-- A keyword search index (`_rtmn_search`) over names, positions, biographies, affiliations and taxonomies
-- Blocks: **Researcher Field** (choose a field in the sidebar), **Researcher Filters** and **Directory Tabs** (Researchers / Labs & institutes)
-- A **Researcher Directory** Query Loop variation and the *University Researcher Directory* and *Researcher Profile* patterns
+- **Your own directory fields** under **Research Labs → Directory Fields**: add, rename, reorder and remove the details you record for each researcher.
+  - A *List of choices* field (for example Faculty, Department or Campus) stores values you pick from. It can be a filter on the public directory and a column in the member list.
+  - A *Text* field holds a short value (for example Office).
+  - Research topic (the Research Areas taxonomy) is built in.
+  - New sites start with Faculty, Department, Research topic, Research theme and Institution. Sites upgrading from the add-on keep its fields.
+  - Removing a field only hides it; the values return if you add the same key again.
+- An *Imported records* section on the same screen for members imported from an external directory: the source names shown on profiles, a default institution, a trusted portrait address, institution aliases and values that are not institutions.
+- A *Directory details* meta box with institutional affiliations (they fill the Institution field) and the text fields.
+- A keyword search index (`_rtmn_search`) over names, positions, biographies, affiliations and every directory field.
+- Blocks: **Researcher Field** (any built-in or configured field), **Researcher Filters** (keyword search plus the fields marked as filters) and **Directory Tabs** (Researchers / Labs & institutes).
+- A **Researcher Directory** Query Loop variation and the *University Researcher Directory* and *Researcher Profile* patterns.
 
-The directory page is `/researchers/` by default. Change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Rename sections with `rtm_network_taxonomies` (filter labels) and `rtm_network_taxonomy_labels` (admin labels). Block, taxonomy and meta names match the add-on, so deactivate the add-on and existing pages keep working.
+The directory page is `/researchers/` by default; change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Developers can adjust fields with the `rtm_network_fields` filter. Block, taxonomy and meta names match the add-on, so deactivate the add-on and existing pages keep working.
 
 ## 📝 Shortcodes
 

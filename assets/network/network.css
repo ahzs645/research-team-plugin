@@ -89,7 +89,7 @@
 .rtmn-profile .rtmn-field--affiliations ul{list-style:none;padding:0;margin:0}
 .rtmn-profile .rtmn-field--affiliations li+li{margin-top:4px}
 .rtmn-profile .rtmn-field--membership{margin:12px 0 0;font-family:var(--rtm-font,'Outfit',sans-serif);font-size:.85rem;color:var(--rtm-muted,#6b7f8e);align-items:baseline;gap:0}
-.rtmn-profile .rtmn-field--membership:before{content:'HRI membership: ';white-space:pre-wrap}
+.rtmn-profile .rtmn-field--membership:before{content:attr(data-label) ': ';white-space:pre-wrap}
 .rtmn-profile .rtmn-tag{padding:0;background:none;border-radius:0;font-size:inherit;line-height:inherit;color:inherit}
 .rtmn-profile .rtmn-tag+.rtmn-tag:before{content:' · ';white-space:pre-wrap;color:var(--rtm-muted,#6b7f8e)}
 .rtmn-profile .rtmn-field--labs{margin-top:18px;gap:0;font-family:var(--rtm-font,'Outfit',sans-serif);font-size:.9rem;line-height:1.6}

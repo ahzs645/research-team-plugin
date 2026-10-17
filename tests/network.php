@@ -25,9 +25,45 @@ function wp_get_object_terms($id, $tax) { return $GLOBALS['terms'][$id][$tax] ??
 function get_term_by($field, $value, $tax) { return $value === 'nursing' ? (object) array('term_id' => 7) : false; }
 function get_option($key, $default = false) { return array_key_exists($key, $GLOBALS['options']) ? $GLOBALS['options'][$key] : $default; }
 function update_option($key, $value) { $GLOBALS['options'][$key] = $value; }
+function sanitize_key($s) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower((string) $s)); }
+function wp_list_pluck($list, $field) { $out = array(); foreach ($list as $k => $v) { $out[$k] = is_array($v) ? $v[$field] : $v->$field; } return $out; }
 function check($ok, $message) { if (!$ok) { fwrite(STDERR, "FAIL: $message\n"); exit(1); } }
 
+require __DIR__ . '/../includes/class-rtm-network-fields.php';
 require __DIR__ . '/../includes/class-rtm-network.php';
+
+// A new site gets generic fields and no institution-specific wording.
+RTM_Network_Fields::seed(false);
+check(!isset(RTM_Network_Fields::all()['membership']) && isset(RTM_Network_Fields::all()['faculty']), 'New site fields not generic.');
+check(RTM_Network_Fields::sources()['directory'] === '' && RTM_Network_Fields::normalize_institution('UNBC') === 'UNBC', 'New site has institution rules.');
+check(RTM_Network_Fields::filters() === array('rn_faculty' => 'rtmn_faculty', 'rn_department' => 'rtmn_department', 'rn_topic' => 'rtm_research_area', 'rn_theme' => 'rtmn_theme', 'rn_institution' => 'rtmn_institution'), 'Default filters wrong: ' . json_encode(RTM_Network_Fields::filters()));
+
+// Custom fields: a filterable list, a non-filter list and a text field.
+$options['rtm_network_fields'] = array(
+    array('key' => 'campus', 'label' => 'Campus', 'plural' => 'Campuses', 'type' => 'choice', 'filter' => true, 'column' => true),
+    array('key' => 'room', 'label' => 'Office', 'type' => 'text', 'filter' => true),
+    array('key' => 'topic', 'label' => 'Expertise area', 'type' => 'topic', 'filter' => true),
+    array('key' => 'Bad Key!', 'label' => 'x'),
+);
+$all = RTM_Network_Fields::all();
+check(array_keys($all) === array('campus', 'room', 'topic', 'badkey'), 'Configured keys wrong: ' . json_encode(array_keys($all)));
+check($all['campus']['taxonomy'] === 'rtmn_campus' && $all['campus']['column'] && $all['room']['meta_key'] === '_rtmn_field_room' && !$all['room']['filter'], 'Field normalisation wrong.');
+check(RTM_Network_Fields::filters() === array('rn_campus' => 'rtmn_campus', 'rn_topic' => 'rtm_research_area'), 'Custom filters wrong.');
+check(RTM_Network::taxonomies()['rtm_research_area'] === 'Expertise area', 'Topic label not configurable.');
+check(RTM_Network::block_field_name($all['campus']) === 'tax:campus' && RTM_Network::block_field_name($all['room']) === 'meta:room' && RTM_Network::block_field_name($all['topic']) === 'topics', 'Block field names wrong.');
+check(in_array('_rtmn_field_room', RTM_Network::indexed_meta(), true), 'Text field not indexed.');
+$titles[3] = 'Tess'; $meta[3] = array('_rtmn_field_room' => 'Lab 4 <b>'); $terms[3] = array('rtmn_campus' => array('Prince George'));
+check(RTM_Network::field_html('meta:room', 3) === 'Lab 4 &lt;b&gt;', 'Text field render wrong.');
+check(RTM_Network::field_html('tax:campus', 3) === '<span class="rtmn-tag">Prince George</span>', 'List field render wrong.');
+check(RTM_Network::field_html('membership', 3) === '' && RTM_Network::field_html('tax:gone', 3) === '', 'Removed field rendered.');
+
+// A site upgrading from the add-on keeps its fields and wording.
+unset($options['rtm_network_fields'], $options['rtm_network_sources']);
+RTM_Network_Fields::seed(true);
+check(RTM_Network_Fields::all()['membership']['label'] === 'HRI membership' && RTM_Network_Fields::sources()['directory'] === 'UNBC', 'Legacy fields not kept.');
+check(array_keys(RTM_Network_Fields::filters()) === array('rn_faculty', 'rn_department', 'rn_appointment', 'rn_supervision', 'rn_topic', 'rn_theme', 'rn_membership', 'rn_institution'), 'Legacy filter order changed.');
+$terms[3]['rtmn_membership'] = array('Full member');
+check(RTM_Network::field_html('membership', 3) === '<span class="rtmn-tag">Full member</span>', 'Legacy membership field broken.');
 
 // Affiliations are bounded, sanitized and drop empty rows.
 $rows = RTM_Network::clean_affiliations(array(array('title' => ' Professor ', 'affiliation' => '<b>UNBC</b>'), array('title' => '', 'affiliation' => ''), 'junk'));

@@ -22,6 +22,8 @@ $rtm_options = array(
     'rtm_default_team',
     'rtm_google_scholar_user_id',
     'rtm_network_enabled',
+    'rtm_network_fields',
+    'rtm_network_sources',
     'rtm_team_menus',
     'rtm_team_menu_label',
     'rtm_team_menu_teams',

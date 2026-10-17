@@ -637,7 +637,10 @@ function rtm_team_settings_page() {
             <?php if (RTM_Network::legacy_addon_active()): ?>
                 <p class="description"><?php esc_html_e('The University Research Network add-on is active and provides the researcher directory. Deactivate it to use the built-in version; existing researchers, filters and pages are kept.', 'research-team-manager'); ?></p>
             <?php else: ?>
-                <p class="description"><?php esc_html_e('Adds faculty, department, appointment, supervision, theme, membership and institution fields, institutional affiliations, keyword search, the Researcher Field / Researcher Filters / Directory Tabs blocks and the researcher directory and profile patterns.', 'research-team-manager'); ?></p>
+                <p class="description"><?php esc_html_e('A public researcher directory: your own directory fields (for example Faculty or Department), institutional affiliations, keyword search, the Researcher Field / Researcher Filters / Directory Tabs blocks and the researcher directory and profile patterns.', 'research-team-manager'); ?></p>
+                <?php if (RTM_Network::is_enabled()): ?>
+                    <p><a class="button" href="<?php echo esc_url(RTM_Network_Fields::page_url()); ?>"><?php esc_html_e('Edit directory fields', 'research-team-manager'); ?></a></p>
+                <?php endif; ?>
                 <form method="post" action="">
                     <?php wp_nonce_field('rtm_network_toggle', 'rtm_network_toggle_nonce'); ?>
                     <input type="hidden" name="rtm_action" value="network_toggle" />
@@ -2602,6 +2605,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-teams.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-zotero.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-positions.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-publications-sources.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-network-fields.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-network.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-updater.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-team-access.php';
