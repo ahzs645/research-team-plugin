@@ -82,17 +82,27 @@ After switching modes the plugin re-flushes permalinks automatically.
 
 ## Configuration
 
-- WordPress 5.0 or higher
+- WordPress 6.5 or higher
 - PHP 7.4 or higher
 - MySQL 5.6 or higher
 
 ## 📦 Installation
 
 ### Standard Installation
-1. Download the plugin files
-2. Upload to your `/wp-content/plugins/research-team-manager/` directory
-3. Activate the plugin through the WordPress admin
+1. Download `research-team-manager-X.Y.Z.zip` from the [latest release](https://github.com/ahzs645/research-team-plugin/releases/latest)
+2. In WordPress, go to **Plugins → Add New → Upload Plugin** and upload the ZIP
+3. Activate the plugin
 4. Configure settings under **Team Members > Settings**
+
+### Updates
+From 1.4.0, WordPress offers new versions from this repository's GitHub releases, just like updates from WordPress.org (**Dashboard → Updates** or the Plugins screen). The plugin's `Update URI` header routes the check to `releases/latest/download/update.json`. A download is installed only when its SHA-256 matches the `update.json` attached to that same release. Automatic background updates are off.
+
+Sites running 1.3.2 or earlier have no updater. Upload the 1.4.0 ZIP once (**Upload Plugin → Replace current with uploaded**).
+
+### Releasing
+1. Bump `Version:` and `RTM_VERSION` in `research-team-manager.php` and add `releases/X.Y.Z.md`.
+2. Run `make test build` locally.
+3. Merge to `main`, then push a tag `vX.Y.Z`. The *Plugin checks and release* workflow builds the ZIP, `.sha256` and `update.json`, and publishes the GitHub release. A tag with a suffix (`vX.Y.Z-rc.1`) creates a prerelease without `update.json`, so sites are not offered it.
 
 ### Manual Installation
 1. Upload the plugin folder to `/wp-content/plugins/`
@@ -147,6 +157,17 @@ Enhanced sorting options for Query Loop blocks:
 - **End Date**: Sort by leave dates (useful for alumni)
 - **Custom Order**: Manual ordering via Display Order field
 - **Date Priority**: Priority members first, then chronological
+
+### Researcher directory
+Formerly the separate *University Research Network* add-on. Turn it on under **Team Settings → Researcher directory**. It switches on by itself on sites that already have data from the add-on. It adds:
+
+- Taxonomies: Faculty, Department, Appointment type, Graduate supervision, Research theme, HRI membership, Institution / affiliation (research topics use **Research Areas**)
+- A *Research network affiliations* meta box (position + institution rows) and a read-only *UNBC source* box for imported members
+- A keyword search index (`_rtmn_search`) over names, positions, biographies, affiliations and taxonomies
+- Blocks: **Researcher Field** (choose a field in the sidebar), **Researcher Filters** and **Directory Tabs** (Researchers / Labs & institutes)
+- A **Researcher Directory** Query Loop variation and the *University Researcher Directory* and *Researcher Profile* patterns
+
+The directory page is `/researchers/` by default. Change it with the `rtm_network_directory_url` and `rtm_network_directory_page` filters. Rename sections with `rtm_network_taxonomies` (filter labels) and `rtm_network_taxonomy_labels` (admin labels). Block, taxonomy and meta names match the add-on, so deactivate the add-on and existing pages keep working.
 
 ## 📝 Shortcodes
 

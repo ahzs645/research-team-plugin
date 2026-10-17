@@ -16,13 +16,13 @@
             
             // Only add controls to Query Loop blocks
             if (props.name !== 'core/query') {
-                return <BlockEdit {...props} />;
+                return wp.element.createElement(BlockEdit, props);
             }
             
             // Check if this query is for team members
             const { query } = attributes;
-            if (!query || query.postType !== 'team_member') {
-                return <BlockEdit {...props} />;
+            if (!query || query.postType !== 'rtm_team_member') {
+                return wp.element.createElement(BlockEdit, props);
             }
 
             // Add our custom orderby options
@@ -36,28 +36,17 @@
                 { label: 'Random', value: 'rand' },
             ];
 
-            return (
-                <Fragment>
-                    <BlockEdit {...props} />
-                    <InspectorControls>
-                        <PanelBody title="Team Member Sorting" initialOpen={true}>
-                            <SelectControl
-                                label="Sort By"
-                                value={query.orderBy || 'date'}
-                                options={customOrderByOptions}
-                                onChange={(value) => {
-                                    setAttributes({
-                                        query: {
-                                            ...query,
-                                            orderBy: value
-                                        }
-                                    });
-                                }}
-                                help="Choose how to sort team members. 'Date Priority + Order' will show prioritized members first, then sort by their custom order number, then by join date."
-                            />
-                        </PanelBody>
-                    </InspectorControls>
-                </Fragment>
+            return wp.element.createElement(Fragment, null,
+                wp.element.createElement(BlockEdit, props),
+                wp.element.createElement(InspectorControls, null,
+                    wp.element.createElement(PanelBody, {title: 'Team Member Sorting', initialOpen: true},
+                        wp.element.createElement(SelectControl, {
+                            label: 'Sort By', value: query.orderBy || 'date', options: customOrderByOptions,
+                            onChange: (value) => setAttributes({query: {...query, orderBy: value}}),
+                            help: "Choose how to sort team members. 'Date Priority + Order' will show prioritized members first, then sort by their custom order number, then by join date."
+                        })
+                    )
+                )
             );
         };
     }, 'withCustomQueryControls');
@@ -75,7 +64,7 @@
         'rtm/modify-team-member-query',
         function(query, block) {
             // Only modify team_member queries
-            if (query.postType !== 'team_member') {
+            if (query.postType !== 'rtm_team_member') {
                 return query;
             }
 

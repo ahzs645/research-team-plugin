@@ -21,6 +21,7 @@ $rtm_options = array(
     'rtm_team_mode',
     'rtm_default_team',
     'rtm_google_scholar_user_id',
+    'rtm_network_enabled',
 );
 foreach ($rtm_options as $rtm_option) {
     delete_option($rtm_option);

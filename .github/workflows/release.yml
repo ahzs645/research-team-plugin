@@ -1,0 +1,68 @@
+name: Plugin checks and release
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: plugin-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.1', '8.3']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: make test
+  package:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate version metadata and tag
+        run: python3 scripts/check-release.py ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+      - run: make build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: research-team-manager
+          path: dist/*
+          if-no-files-found: error
+      # Stable tags (v1.4.0) publish update.json, which WordPress sites poll via
+      # releases/latest. Prerelease tags (v1.4.0-rc.1) omit it.
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          version="${version%%-*}"
+          assets=("dist/research-team-manager-$version.zip" "dist/research-team-manager-$version.zip.sha256")
+          if [[ "$GITHUB_REF_NAME" != *-* ]]; then
+            assets+=("dist/update.json")
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Never replace published assets; a rebuilt tag must be identical.
+            mkdir -p "$RUNNER_TEMP/existing-release"
+            for asset in "${assets[@]}"; do
+              gh release download "$GITHUB_REF_NAME" --pattern "${asset##*/}" --dir "$RUNNER_TEMP/existing-release"
+              cmp "$asset" "$RUNNER_TEMP/existing-release/${asset##*/}"
+            done
+          elif [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --prerelease --latest=false --title "Research Team Manager ${GITHUB_REF_NAME#v} (prerelease)" --notes-file "releases/$version.md"
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --title "Research Team Manager $version" --notes-file "releases/$version.md"
+          fi

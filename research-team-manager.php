@@ -1,12 +1,15 @@
 <?php
 /**
  * Plugin Name: Research Team Manager Simple
- * Plugin URI: https://example.com/research-team-manager
+ * Plugin URI: https://github.com/ahzs645/research-team-plugin
  * Description: A comprehensive plugin to manage research team members and publications with Google Scholar integration. Supports single-team and multiple-teams (one page per lab) modes.
- * Version: 1.3.2
+ * Version: 1.4.0
  * Author: Research Team Manager
  * License: GPL v2 or later
  * Text Domain: research-team-manager
+ * Requires at least: 6.5
+ * Requires PHP: 7.4
+ * Update URI: https://github.com/ahzs645/research-team-plugin
  */
 
 if (!defined('ABSPATH')) {
@@ -14,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('RTM_VERSION', '1.3.2');
+define('RTM_VERSION', '1.4.0');
 define('RTM_PLUGIN_FILE', __FILE__);
 define('RTM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('RTM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -619,6 +622,22 @@ function rtm_team_settings_page() {
             </div>
 
         <?php endif; ?>
+
+        <?php // Researcher directory (formerly the University Research Network add-on) ?>
+        <div class="card" style="max-width:760px; margin-top:20px;">
+            <h2><?php esc_html_e('Researcher directory', 'research-team-manager'); ?></h2>
+            <?php if (RTM_Network::legacy_addon_active()): ?>
+                <p class="description"><?php esc_html_e('The University Research Network add-on is active and provides the researcher directory. Deactivate it to use the built-in version; existing researchers, filters and pages are kept.', 'research-team-manager'); ?></p>
+            <?php else: ?>
+                <p class="description"><?php esc_html_e('Adds faculty, department, appointment, supervision, theme, membership and institution fields, institutional affiliations, keyword search, the Researcher Field / Researcher Filters / Directory Tabs blocks and the researcher directory and profile patterns.', 'research-team-manager'); ?></p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('rtm_network_toggle', 'rtm_network_toggle_nonce'); ?>
+                    <input type="hidden" name="rtm_action" value="network_toggle" />
+                    <p><label><input type="checkbox" name="rtm_network_enabled" value="1" <?php checked(RTM_Network::is_enabled()); ?> /> <?php esc_html_e('Enable the researcher directory', 'research-team-manager'); ?></label></p>
+                    <?php submit_button(__('Save researcher directory setting', 'research-team-manager'), 'secondary', 'submit', false); ?>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
     <?php
 }
@@ -629,6 +648,13 @@ function rtm_team_settings_handle_post() {
         return;
     }
     $action = sanitize_key($_POST['rtm_action']);
+
+    // Researcher directory on/off. Takes effect on the next page load.
+    if ($action === 'network_toggle' && check_admin_referer('rtm_network_toggle', 'rtm_network_toggle_nonce')) {
+        update_option(RTM_Network::OPTION, empty($_POST['rtm_network_enabled']) ? '0' : '1');
+        rtm_admin_notice(__('Researcher directory setting saved. Reload any open editors to see the change.', 'research-team-manager'));
+        return;
+    }
 
     // Change active team (already in single mode).
     if ($action === 'update_active' && check_admin_referer('rtm_update_active', 'rtm_update_active_nonce')) {
@@ -2467,6 +2493,12 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-teams.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-zotero.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-positions.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-publications-sources.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-network.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rtm-updater.php';
+
+// Researcher directory and GitHub release updates.
+RTM_Network::boot();
+RTM_Updater::boot();
 
 // Per-lab team settings. Instantiated at load time (not on `init`) so its own
 // `init` hook for register_term_meta() is in place before `init` fires.

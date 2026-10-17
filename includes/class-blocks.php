@@ -166,8 +166,8 @@ class RTM_Blocks {
         wp_enqueue_script(
             'rtm-block-editor-extensions',
             plugin_dir_url(dirname(__FILE__)) . 'assets/block-editor-extensions.js',
-            array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-compose', 'wp-hooks'),
-            '1.0.0',
+            array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-compose', 'wp-hooks'),
+            RTM_VERSION,
             true
         );
     }
