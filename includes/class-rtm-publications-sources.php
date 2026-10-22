@@ -21,8 +21,11 @@ class RTM_Pub_Sources {
     const SCHOLAR = 'google_scholar';
     const ZOTERO  = 'zotero';
 
-    const OPT_SOURCE = 'rtm_publications_source';
-    const OPT_ZOTERO = 'rtm_zotero_group_id';
+    const OPT_SOURCE   = 'rtm_publications_source';
+    const OPT_ZOTERO   = 'rtm_zotero_group_id';
+    const OPT_SCHEDULE = 'rtm_publications_schedule';
+    const OPT_LAST     = 'rtm_publications_last_sync';
+    const CRON_HOOK    = 'rtm_publications_sync_event';
 
     /** Known sources => label. */
     public static function sources() {
@@ -207,6 +210,111 @@ class RTM_Pub_Sources {
             'pruned'  => $pruned,
             'dry_run' => (bool) $dry_run,
             'samples' => $samples,
+        );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Scheduled auto-sync (WP-Cron)                                       */
+    /* ------------------------------------------------------------------ */
+
+    /** Auto-sync frequency options (key => label). Keys are WP-Cron recurrences. */
+    public static function schedules() {
+        return array(
+            'off'    => __('Off — manual sync only', 'research-team-manager'),
+            'daily'  => __('Daily', 'research-team-manager'),
+            'weekly' => __('Weekly', 'research-team-manager'),
+        );
+    }
+
+    public static function get_schedule() {
+        $s = get_option(self::OPT_SCHEDULE, 'off');
+        return array_key_exists($s, self::schedules()) ? $s : 'off';
+    }
+
+    /** Wire the cron handler + self-healing scheduler. Called once at load. */
+    public static function init() {
+        add_filter('cron_schedules', array(__CLASS__, 'add_weekly'));
+        add_action(self::CRON_HOOK, array(__CLASS__, 'run_scheduled'));
+        add_action('init', array(__CLASS__, 'maybe_schedule'));
+    }
+
+    /** Guarantee a "weekly" recurrence exists (core has had it since 5.4, but be safe). */
+    public static function add_weekly($schedules) {
+        if (!isset($schedules['weekly'])) {
+            $schedules['weekly'] = array('interval' => WEEK_IN_SECONDS, 'display' => __('Once Weekly', 'research-team-manager'));
+        }
+        return $schedules;
+    }
+
+    /** Ensure a scheduled event exists iff a frequency is set. */
+    public static function maybe_schedule() {
+        $freq = self::get_schedule();
+        $next = wp_next_scheduled(self::CRON_HOOK);
+        if ($freq === 'off') {
+            if ($next) {
+                wp_unschedule_event($next, self::CRON_HOOK);
+            }
+            return;
+        }
+        if (!$next) {
+            wp_schedule_event(time() + MINUTE_IN_SECONDS, $freq, self::CRON_HOOK);
+        }
+    }
+
+    /** Persist a new frequency and (re)schedule the cron event immediately. */
+    public static function reschedule($freq) {
+        $freq = array_key_exists($freq, self::schedules()) ? $freq : 'off';
+        update_option(self::OPT_SCHEDULE, $freq);
+        self::clear_schedule();
+        if ($freq !== 'off') {
+            wp_schedule_event(time() + MINUTE_IN_SECONDS, $freq, self::CRON_HOOK);
+        }
+    }
+
+    /** Remove any scheduled event (deactivation / off). */
+    public static function clear_schedule() {
+        $ts = wp_next_scheduled(self::CRON_HOOK);
+        if ($ts) {
+            wp_unschedule_event($ts, self::CRON_HOOK);
+        }
+        wp_clear_scheduled_hook(self::CRON_HOOK);
+    }
+
+    /**
+     * Cron callback: sync every team whose source isn't Manual, and record a
+     * summary. Silent (no output) — runs in cron context.
+     */
+    public static function run_scheduled() {
+        if (function_exists('rtm_is_multiple_teams') && rtm_is_multiple_teams()) {
+            $team_ids = get_terms(array('taxonomy' => 'rtm_research_team', 'hide_empty' => false, 'fields' => 'ids'));
+            $team_ids = array_map('intval', (array) $team_ids);
+            if (empty($team_ids)) {
+                $team_ids = array(0);
+            }
+        } else {
+            $team_ids = array(0);
+        }
+
+        $results = array();
+        foreach ($team_ids as $tid) {
+            if (self::get_source($tid) === self::MANUAL) {
+                continue;
+            }
+            $r = self::sync($tid, false);
+            $results[$tid] = is_wp_error($r)
+                ? array('error' => $r->get_error_message())
+                : array('source' => $r['source'], 'new' => $r['new'], 'updated' => $r['updated'], 'pruned' => $r['pruned']);
+        }
+
+        update_option(self::OPT_LAST, array('time' => time(), 'results' => $results));
+    }
+
+    /** Status for the settings screen: schedule, next run, last run. */
+    public static function status() {
+        return array(
+            'schedule' => self::get_schedule(),
+            'next'     => wp_next_scheduled(self::CRON_HOOK),
+            'last'     => get_option(self::OPT_LAST, null),
         );
     }
 }
